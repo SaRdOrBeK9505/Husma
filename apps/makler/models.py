@@ -1,4 +1,6 @@
 from django.db import models
+from django.utils import timezone
+from datetime import timedelta
 from apps.users.models import CustomUser
 from apps.hudud.models import Hudud
 
@@ -25,9 +27,25 @@ class MaklerProfil(models.Model):
     verify_holat = models.CharField(
         max_length=10,
         choices=VerifyHolat.choices,
-        default=VerifyHolat.PENDING
+        default=VerifyHolat.VERIFIED  # Ro'yxatdan o'tganda darhol verified
     )
     verify_qilingan_vaqt = models.DateTimeField(blank=True, null=True)
+
+    # Obuna tizimi uchun — keyinchalik to'ldiriladi
+    # Hozir ro'yxatdan o'tgan kundan 7 kun bepul sinov muddati beriladi
+    bepul_muddat_tugash = models.DateTimeField(
+        blank=True, null=True,
+        help_text="Bepul sinov muddati tugash vaqti (ro'yxatdan o'tgandan 7 kun)"
+    )
+    obuna_faol = models.BooleanField(
+        default=False,
+        help_text="To'liq obuna faolmi (keyinchalik qo'shiladi)"
+    )
+    obuna_tugash = models.DateTimeField(
+        blank=True, null=True,
+        help_text="Obuna tugash vaqti (keyinchalik qo'shiladi)"
+    )
+
     ortacha_reyting = models.DecimalField(
         max_digits=3,
         decimal_places=2,
@@ -43,3 +61,22 @@ class MaklerProfil(models.Model):
 
     def __str__(self):
         return f"{self.user} — {self.verify_holat}"
+
+    @property
+    def faol(self) -> bool:
+        """
+        Rieltor hozir ishlashi mumkinmi.
+        Ikkita holat: bepul muddat ichida YOKI faol obuna bor.
+        Keyinchalik obuna tizimi qo'shilganda faqat shu property o'zgaradi.
+        """
+        now = timezone.now()
+
+        # Bepul sinov muddati ichidami
+        if self.bepul_muddat_tugash and now <= self.bepul_muddat_tugash:
+            return True
+
+        # Faol obuna bormi (keyinchalik qo'shiladi)
+        if self.obuna_faol and self.obuna_tugash and now <= self.obuna_tugash:
+            return True
+
+        return False

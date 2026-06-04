@@ -4,21 +4,23 @@ from .views import (
     TelegramAuthView,
     MeView,
     StatistikaView,
-    RieltorRoliSorovView,
-    RieltorRegisterView,
     RieltorLoginView,
-    RieltorVerifyHolatView,
+    RieltorFaollikView,
+    RieltorOTPSorovView,
+    RieltorOTPVerifyView,
 )
 
 urlpatterns = [
-    # ===== USER AUTH (Telegram) =====
+    # ===== USER AUTH =====
     path('auth/telegram/', TelegramAuthView.as_view(), name='telegram-auth'),
-    path('auth/rieltor-sorovi/', RieltorRoliSorovView.as_view(), name='rieltor-sorovi'),
 
-    # ===== RIELTOR AUTH (Username + Parol) =====
-    path('auth/rieltor/register/', RieltorRegisterView.as_view(), name='rieltor-register'),
+    # ===== RIELTOR REGISTER (OTP) =====
+    path('auth/rieltor/otp-sorov/', RieltorOTPSorovView.as_view(), name='rieltor-otp-sorov'),
+    path('auth/rieltor/otp-verify/', RieltorOTPVerifyView.as_view(), name='rieltor-otp-verify'),
+
+    # ===== RIELTOR LOGIN =====
     path('auth/rieltor/login/', RieltorLoginView.as_view(), name='rieltor-login'),
-    path('auth/rieltor/verify-holat/', RieltorVerifyHolatView.as_view(), name='rieltor-verify-holat'),
+    path('auth/rieltor/faollik/', RieltorFaollikView.as_view(), name='rieltor-faollik'),
 
     # ===== UMUMIY =====
     path('auth/refresh/', TokenRefreshView.as_view(), name='token-refresh'),

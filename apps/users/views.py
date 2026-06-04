@@ -3,23 +3,25 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
+from django.utils import timezone
+from datetime import timedelta
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from apps.ariza.models import Ariza
 from apps.makler.models import MaklerProfil
-from apps.hudud.models import Hudud
-from .models import CustomUser
+from .models import CustomUser, OTPKode
+from .otp_service import kode_generatsiya, otp_yuborish
 from .serializers import (
     TelegramAuthSerializer,
     UserSerializer,
-    RieltorRoliSorovSerializer,
-    RieltorRegisterSerializer,
     RieltorLoginSerializer,
-    RieltorProfileResponseSerializer,
+    RieltorOTPSorovSerializer,
+    RieltorOTPVerifySerializer,
 )
 from .auth import verify_telegram_auth, parse_webapp_user
 
+
+# ===== USER AUTH =====
 
 class TelegramAuthView(APIView):
     permission_classes = [AllowAny]
@@ -31,23 +33,21 @@ class TelegramAuthView(APIView):
         responses={
             200: OpenApiResponse(
                 description="Muvaffaqiyatli login",
-                examples=[
-                    OpenApiExample(
-                        name="Success",
-                        value={
-                            "access": "eyJhbGciOiJIUzI1NiJ9...",
-                            "refresh": "eyJhbGciOiJIUzI1NiJ9...",
-                            "user": {
-                                "id": 1,
-                                "telegram_id": 123456789,
-                                "full_name": "Ali Valiyev",
-                                "telegram_username": "ali_uz",
-                                "role": "user",
-                            },
-                            "is_new": True,
-                        }
-                    )
-                ]
+                examples=[OpenApiExample(
+                    name="Success",
+                    value={
+                        "access": "eyJ...",
+                        "refresh": "eyJ...",
+                        "user": {
+                            "id": 1,
+                            "telegram_id": 123456789,
+                            "full_name": "Ali Valiyev",
+                            "telegram_username": "ali_uz",
+                            "role": "user",
+                        },
+                        "is_new": True,
+                    }
+                )]
             ),
             400: OpenApiResponse(description="Noto'g'ri ma'lumot"),
             401: OpenApiResponse(description="Autentifikatsiya muvaffaqiyatsiz"),
@@ -64,7 +64,7 @@ class TelegramAuthView(APIView):
             parsed = parse_webapp_user(init_data)
         except Exception:
             return Response(
-                {'error': 'initData noto\'g\'ri formatda'},
+                {'error': "initData noto'g'ri formatda"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -127,82 +127,10 @@ class MeView(APIView):
         tags=["Users"],
     )
     def patch(self, request):
-        serializer = UserSerializer(
-            request.user, data=request.data, partial=True
-        )
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
-
-
-class RieltorRoliSorovView(APIView):
-    """
-    User rieltor bo'lmoqchi bo'lsa shu endpoint orqali so'rov yuboradi.
-    Admin verify qilgunicha 'pending' holatda turadi.
-    """
-    permission_classes = [IsAuthenticated]
-
-    @extend_schema(
-        summary="Rieltor bo'lish uchun so'rov",
-        description="""
-        User rieltor bo'lmoqchi bo'lsa shu endpoint ga murojaat qiladi.
-        - Role 'makler' ga o'zgaradi
-        - RieltorProfil yaratiladi (pending holatda)
-        - Admin verify qilgunicha arizalar ko'rinmaydi
-        """,
-        request=RieltorRoliSorovSerializer,
-        responses={
-            200: OpenApiResponse(description="So'rov yuborildi"),
-            400: OpenApiResponse(description="Allaqachon rieltor"),
-        },
-        tags=["Auth"],
-    )
-    def post(self, request):
-        if request.user.role == 'makler':
-            return Response(
-                {'error': 'Siz allaqachon rieltor rolidasisiz'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        serializer = RieltorRoliSorovSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        data = serializer.validated_data
-        hududlar_ids = data.get('hududlar', [])
-
-        hududlar = Hudud.objects.filter(
-            id__in=hududlar_ids,
-            is_active=True
-        )
-        if hududlar.count() != len(hududlar_ids):
-            return Response(
-                {'error': 'Bir yoki bir nechta hudud topilmadi'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        request.user.role = 'makler'
-        request.user.save(update_fields=['role'])
-
-        rieltor_profil, created = MaklerProfil.objects.get_or_create(
-            user=request.user,
-            defaults={
-                'bio': data.get('bio', ''),
-                'telegram_link': data.get('telegram_link', ''),
-            }
-        )
-
-        if not created:
-            rieltor_profil.bio = data.get('bio', rieltor_profil.bio)
-            rieltor_profil.telegram_link = data.get('telegram_link', rieltor_profil.telegram_link)
-            rieltor_profil.save(update_fields=['bio', 'telegram_link'])
-
-        rieltor_profil.hududlar.set(hududlar)
-
-        return Response({
-            'message': 'So\'rovingiz qabul qilindi. Admin tasdiqlashini kuting.',
-            'verify_holat': rieltor_profil.verify_holat,
-            'hududlar': [h.nomi for h in hududlar],
-        }, status=status.HTTP_200_OK)
 
 
 class StatistikaView(APIView):
@@ -214,133 +142,34 @@ class StatistikaView(APIView):
         responses={
             200: OpenApiResponse(
                 description="Statistika",
-                examples=[
-                    OpenApiExample(
-                        name="Success",
-                        value={
-                            "jami_bitimlar": 500,
-                            "jami_rieltorlar": 50,
-                            "javob_vaqti": "2s",
-                        }
-                    )
-                ]
+                examples=[OpenApiExample(
+                    name="Success",
+                    value={
+                        "jami_bitimlar": 500,
+                        "jami_rieltorlar": 50,
+                        "javob_vaqti": "2s",
+                    }
+                )]
             )
         },
         tags=["Statistika"],
     )
     def get(self, request):
-        data = {
-            "jami_bitimlar": Ariza.objects.filter(holat='yopilgan').count(),
-            "jami_rieltorlar": MaklerProfil.objects.filter(
-                verify_holat='verified'
-            ).count(),
-            "javob_vaqti": "2s",
-        }
-        return Response(data)
-
-
-# ===== RIELTOR USERNAME/PAROL AUTH =====
-
-class RieltorRegisterView(APIView):
-    """
-    Rieltor ro'yxatdan o'tish.
-    Username + parol bilan — Telegram'ga bog'liq emas.
-    Ro'yxatdan o'tgach admin verify qilgunicha 'pending' holatda turadi.
-    """
-    permission_classes = [AllowAny]
-
-    @extend_schema(
-        summary="Rieltor ro'yxatdan o'tish",
-        description=(
-            "Yangi rieltor ro'yxatdan o'tadi. "
-            "Yaratilgach `verify_holat='pending'` bo'ladi. "
-            "Admin `verified` qilgunicha arizalar ko'rinmaydi."
-        ),
-        request=RieltorRegisterSerializer,
-        responses={
-            201: OpenApiResponse(
-                description="Muvaffaqiyatli ro'yxatdan o'tildi",
-                examples=[OpenApiExample(
-                    name="Success",
-                    value={
-                        "message": "Ro'yxatdan o'tdingiz. Admin tasdiqlashini kuting.",
-                        "access": "eyJ...",
-                        "refresh": "eyJ...",
-                        "rieltor": {
-                            "id": 1,
-                            "username": "ali_rieltor",
-                            "full_name": "Ali Valiyev",
-                            "verify_holat": "pending",
-                        }
-                    }
-                )]
-            ),
-            400: OpenApiResponse(description="Validatsiya xatosi"),
-        },
-        tags=["Auth"],
-    )
-    def post(self, request):
-        serializer = RieltorRegisterSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        # User yaratish — to'g'ridan create() emas, to'liq nazorat uchun
-        user = CustomUser(
-            username=data['username'],
-            full_name=data['full_name'],
-            phone=data.get('phone') or '',
-            role=CustomUser.Role.MAKLER,
-        )
-        user.set_password(data['password'])
-        user.save()
-
-        # Rieltor profil yaratish (pending)
-        rieltor = MaklerProfil.objects.create(
-            user=user,
-            bio=data.get('bio', ''),
-            telegram_link=data.get('telegram_link', ''),
-            verify_holat=MaklerProfil.VerifyHolat.PENDING,
-        )
-
-        # Hududlarni bog'lash
-        hududlar = Hudud.objects.filter(id__in=data['hududlar'], is_active=True)
-        rieltor.hududlar.set(hududlar)
-
-        # JWT token
-        refresh = RefreshToken.for_user(user)
-
         return Response({
-            "message": "Ro'yxatdan o'tdingiz. Admin tasdiqlashini kuting.",
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-            "rieltor": {
-                "id": user.id,
-                "username": user.username,
-                "full_name": user.full_name,
-                "phone": user.phone,
-                "role": user.role,
-                "verify_holat": rieltor.verify_holat,
-                "bio": rieltor.bio,
-                "telegram_link": rieltor.telegram_link,
-            }
-        }, status=status.HTTP_201_CREATED)
+            "jami_bitimlar": Ariza.objects.filter(holat='yopilgan').count(),
+            "jami_rieltorlar": MaklerProfil.objects.filter(verify_holat='verified').count(),
+            "javob_vaqti": "2s",
+        })
 
+
+# ===== RIELTOR AUTH =====
 
 class RieltorLoginView(APIView):
-    """
-    Rieltor login — username + parol.
-    verify_holat har doim response da qaytariladi,
-    frontend shunga qarab yo panelni ko'rsatadi, yo 'kutish' ekranini.
-    """
     permission_classes = [AllowAny]
 
     @extend_schema(
         summary="Rieltor kirish",
-        description=(
-            "Username va parol bilan kirish. "
-            "`verify_holat` ni tekshiring: "
-            "`verified` → panel, `pending` → kutish ekrani, `rejected` → rad etildi."
-        ),
+        description="Username va parol bilan kirish.",
         request=RieltorLoginSerializer,
         responses={
             200: OpenApiResponse(
@@ -354,7 +183,8 @@ class RieltorLoginView(APIView):
                             "id": 1,
                             "username": "ali_rieltor",
                             "full_name": "Ali Valiyev",
-                            "verify_holat": "verified",
+                            "faol": True,
+                            "bepul_muddat_tugash": "2026-06-11T10:00:00Z",
                         }
                     }
                 )]
@@ -371,8 +201,6 @@ class RieltorLoginView(APIView):
         username = serializer.validated_data['username']
         password = serializer.validated_data['password']
 
-        # Django authenticate — USERNAME_FIELD = telegram_id bo'lgani uchun
-        # to'g'ridan-to'g'ri user ni topamiz
         try:
             user = CustomUser.objects.get(username=username)
         except CustomUser.DoesNotExist:
@@ -412,35 +240,39 @@ class RieltorLoginView(APIView):
                 "full_name": user.full_name,
                 "phone": user.phone,
                 "role": user.role,
-                "verify_holat": rieltor.verify_holat,
+                "faol": rieltor.faol,
+                "bepul_muddat_tugash": rieltor.bepul_muddat_tugash,
                 "bio": rieltor.bio,
                 "telegram_link": rieltor.telegram_link,
             }
         }, status=status.HTTP_200_OK)
 
 
-class RieltorVerifyHolatView(APIView):
-    """
-    Rieltor o'z verify holatini tekshiradi.
-    Frontend polling yoki sahifa ochilganda tekshirish uchun.
-    """
+class RieltorFaollikView(APIView):
+    """Rieltor bepul muddat yoki obuna holatini tekshiradi."""
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
-        summary="Rieltor verify holatini tekshirish",
-        description="Pending rieltor admin tasdiqlashini kutayotganda shu endpoint ni so'raydi.",
+        summary="Rieltor faollik holatini tekshirish",
         responses={
             200: OpenApiResponse(
-                description="Verify holat",
+                description="Faollik holat",
                 examples=[OpenApiExample(
-                    name="Pending",
-                    value={"verify_holat": "pending", "message": "Admin tasdiqlashini kuting"}
+                    name="Faol",
+                    value={
+                        "faol": True,
+                        "bepul_muddat_tugash": "2026-06-11T10:00:00Z",
+                        "obuna_faol": False,
+                        "message": "Bepul sinov muddati davom etmoqda."
+                    }
                 ), OpenApiExample(
-                    name="Verified",
-                    value={"verify_holat": "verified", "message": "Tasdiqlandi! Panelga kirishingiz mumkin."}
-                ), OpenApiExample(
-                    name="Rejected",
-                    value={"verify_holat": "rejected", "message": "Arizangiz rad etildi. Admin bilan bog'laning."}
+                    name="Tugagan",
+                    value={
+                        "faol": False,
+                        "bepul_muddat_tugash": "2026-05-01T10:00:00Z",
+                        "obuna_faol": False,
+                        "message": "Bepul sinov muddati tugagan. Obuna oling."
+                    }
                 )]
             ),
             403: OpenApiResponse(description="Rieltor profil topilmadi"),
@@ -456,13 +288,208 @@ class RieltorVerifyHolatView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        messages = {
-            'pending': "Admin tasdiqlashini kuting",
-            'verified': "Tasdiqlandi! Panelga kirishingiz mumkin.",
-            'rejected': "Arizangiz rad etildi. Admin bilan bog'laning.",
-        }
+        if rieltor.faol:
+            message = "Obunangiz faol." if rieltor.obuna_faol else "Bepul sinov muddati davom etmoqda."
+        else:
+            message = "Bepul sinov muddati tugagan. Obuna oling."
 
         return Response({
-            "verify_holat": rieltor.verify_holat,
-            "message": messages.get(rieltor.verify_holat, ""),
+            "faol": rieltor.faol,
+            "bepul_muddat_tugash": rieltor.bepul_muddat_tugash,
+            "obuna_faol": rieltor.obuna_faol,
+            "obuna_tugash": rieltor.obuna_tugash,
+            "message": message,
         })
+
+
+# ===== OTP ORQALI RIELTOR REGISTER =====
+
+class RieltorOTPSorovView(APIView):
+    """
+    Rieltor register — 1-qadam.
+    Telegram auth o'tgan user JWT bilan murojaat qiladi.
+    telegram_id request.user dan olinadi.
+    Telegramga 6 xonali OTP kodi yuboriladi.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Rieltor OTP so'rovi (1-qadam)",
+        description=(
+            "Telegram auth o'tgan user rieltor bo'lmoqchi bo'lganda chaqiradi. "
+            "Body: full_name, phone, username, password. "
+            "Hudud va telegram_link keyinchalik profildan qo'shiladi. "
+            "Telegramga 6 xonali tasdiqlash kodi yuboriladi (5 daqiqa amal qiladi)."
+        ),
+        request=RieltorOTPSorovSerializer,
+        responses={
+            200: OpenApiResponse(
+                description="Kode yuborildi",
+                examples=[OpenApiExample(
+                    name="Success",
+                    value={"message": "Tasdiqlash kodi Telegramingizga yuborildi"}
+                )]
+            ),
+            400: OpenApiResponse(description="Validatsiya xatosi yoki allaqachon rieltor"),
+            403: OpenApiResponse(description="Telegram ID topilmadi"),
+            503: OpenApiResponse(description="Telegram xabar yuborilmadi"),
+        },
+        tags=["Auth"],
+    )
+    def post(self, request):
+        telegram_id = request.user.telegram_id
+        if not telegram_id:
+            return Response(
+                {'error': "Akkauntingizda Telegram ID topilmadi. Telegram orqali kiring."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if request.user.role == CustomUser.Role.MAKLER:
+            return Response(
+                {'error': "Siz allaqachon rieltor rolidasisiz."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = RieltorOTPSorovSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        # Avvalgi kodlarni o'chirib tashlaymiz
+        OTPKode.objects.filter(telegram_id=telegram_id).delete()
+
+        kode = kode_generatsiya()
+        otp = OTPKode.objects.create(
+            telegram_id=telegram_id,
+            kode=kode,
+            register_data={
+                'full_name': data['full_name'],
+                'phone': data['phone'],
+                'username': data['username'],
+                'password': data['password'],
+            }
+        )
+
+        yuborildi = otp_yuborish(otp)
+        if not yuborildi:
+            otp.delete()
+            return Response(
+                {'error': "Telegram ga xabar yuborib bo'lmadi. Bot bilan /start qilganingizni tekshiring."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
+        return Response({
+            "message": "Tasdiqlash kodi Telegramingizga yuborildi",
+        }, status=status.HTTP_200_OK)
+
+
+class RieltorOTPVerifyView(APIView):
+    """
+    Rieltor register — 2-qadam.
+    Telegram auth o'tgan user JWT bilan kode yuboradi.
+    To'g'ri bo'lsa user makler roliga o'tadi, MaklerProfil yaratiladi.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Rieltor OTP tasdiqlash (2-qadam)",
+        description=(
+            "Telegramga kelgan 6 xonali kode yuboriladi. "
+            "Muvaffaqiyatli bo'lsa rieltor yaratiladi, 7 kunlik bepul muddat boshlanadi."
+        ),
+        request=RieltorOTPVerifySerializer,
+        responses={
+            201: OpenApiResponse(
+                description="Rieltor yaratildi",
+                examples=[OpenApiExample(
+                    name="Success",
+                    value={
+                        "message": "Ro'yxatdan o'tdingiz. 7 kunlik bepul sinov muddati boshlandi.",
+                        "access": "eyJ...",
+                        "refresh": "eyJ...",
+                        "rieltor": {
+                            "id": 1,
+                            "username": "ali_rieltor",
+                            "full_name": "Ali Valiyev",
+                            "faol": True,
+                            "bepul_muddat_tugash": "2026-06-11T10:00:00Z",
+                        }
+                    }
+                )]
+            ),
+            400: OpenApiResponse(description="Noto'g'ri yoki muddati o'tgan kod"),
+            403: OpenApiResponse(description="Telegram ID topilmadi"),
+        },
+        tags=["Auth"],
+    )
+    def post(self, request):
+        telegram_id = request.user.telegram_id
+        if not telegram_id:
+            return Response(
+                {'error': "Akkauntingizda Telegram ID topilmadi. Telegram orqali kiring."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = RieltorOTPVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        kode = serializer.validated_data['kode']
+
+        try:
+            otp = OTPKode.objects.get(telegram_id=telegram_id, kode=kode)
+        except OTPKode.DoesNotExist:
+            return Response(
+                {'error': "Kod noto'g'ri yoki topilmadi"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if otp.muddati_otganmi:
+            otp.delete()
+            return Response(
+                {'error': "Kod muddati o'tgan. Qaytadan boshlang."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        reg = otp.register_data
+
+        # request.user ni yangilaymiz
+        user = request.user
+        user.full_name = reg['full_name']
+        user.phone = reg['phone']
+        user.username = reg['username']
+        user.role = CustomUser.Role.MAKLER
+        user.set_password(reg['password'])
+        user.save()
+
+        # Rieltor profil — 7 kunlik bepul muddat bilan
+        bepul_muddat = timezone.now() + timedelta(days=7)
+
+        rieltor, created = MaklerProfil.objects.get_or_create(
+            user=user,
+            defaults={
+                'verify_holat': MaklerProfil.VerifyHolat.VERIFIED,
+                'bepul_muddat_tugash': bepul_muddat,
+            }
+        )
+        if not created:
+            rieltor.verify_holat = MaklerProfil.VerifyHolat.VERIFIED
+            rieltor.bepul_muddat_tugash = bepul_muddat
+            rieltor.save(update_fields=['verify_holat', 'bepul_muddat_tugash'])
+
+        otp.delete()
+
+        # Role o'zgargani uchun yangi JWT
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            "message": "Ro'yxatdan o'tdingiz. 7 kunlik bepul sinov muddati boshlandi.",
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "rieltor": {
+                "id": user.id,
+                "username": user.username,
+                "full_name": user.full_name,
+                "phone": user.phone,
+                "role": user.role,
+                "faol": rieltor.faol,
+                "bepul_muddat_tugash": rieltor.bepul_muddat_tugash,
+            }
+        }, status=status.HTTP_201_CREATED)

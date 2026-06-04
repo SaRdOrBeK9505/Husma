@@ -1,5 +1,8 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+from django.utils import timezone
+from datetime import timedelta
+
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, telegram_id, **extra_fields):
@@ -50,3 +53,33 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.full_name or self.telegram_username or self.telegram_id}"
+
+
+class OTPKode(models.Model):
+    """
+    Rieltor ro'yxatdan o'tish OTP kodi.
+    Register paytida vaqtinchalik saqlanadi, verify qilinganidan keyin o'chiriladi.
+    """
+    telegram_id = models.BigIntegerField()
+    kode = models.CharField(max_length=6)
+    # Registratsiya ma'lumotlarini JSON sifatida saqlab turamiz
+    # (verify qilinganida foydalaniladi)
+    register_data = models.JSONField(default=dict)
+    yaratilgan_vaqt = models.DateTimeField(auto_now_add=True)
+    amal_qilish_vaqti = models.DateTimeField()
+
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            self.amal_qilish_vaqti = timezone.now() + timedelta(minutes=5)
+        super().save(*args, **kwargs)
+
+    @property
+    def muddati_otganmi(self):
+        return timezone.now() > self.amal_qilish_vaqti
+
+    class Meta:
+        verbose_name = 'OTP Kode'
+        verbose_name_plural = 'OTP Kodlar'
+
+    def __str__(self):
+        return f"{self.telegram_id} — {self.kode}"

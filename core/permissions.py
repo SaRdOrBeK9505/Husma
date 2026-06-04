@@ -22,14 +22,18 @@ class IsRieltor(BasePermission):
 
 
 class IsVerifiedRieltor(BasePermission):
-    """Faqat verified rieltorlar"""
-    message = 'Faqat tasdiqlangan rieltorlar uchun'
+    """
+    Rieltor ishlashi mumkin bo'lgan holat:
+    - Bepul sinov muddati (7 kun) ichida, YOKI
+    - Faol obunasi bor (keyinchalik qo'shiladi)
+    """
+    message = 'Kirish uchun bepul sinov muddati tugagan. Obuna oling.'
 
     def has_permission(self, request, view):
         if not (request.user.is_authenticated and request.user.role == 'makler'):
             return False
         try:
-            return request.user.rieltor_profil.verify_holat == 'verified'
+            return request.user.rieltor_profil.faol
         except Exception:
             return False
 

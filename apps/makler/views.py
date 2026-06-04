@@ -10,7 +10,6 @@ from .models import MaklerProfil, CustomUser
 from .serializers import (
     RieltorProfilSerializer,
     RieltorProfilUpdateSerializer,
-    RieltorVerifySerializer,
 )
 
 
@@ -58,33 +57,6 @@ class AdminRieltorListView(ListAPIView):
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
 
-
-class AdminRieltorVerifyView(APIView):
-    permission_classes = [IsAdmin]
-
-    @extend_schema(
-        summary="Rieltorni verify qilish (Admin)",
-        request=RieltorVerifySerializer,
-        responses={200: RieltorProfilSerializer},
-        tags=["Admin"],
-    )
-    def post(self, request, pk):
-        try:
-            rieltor = MaklerProfil.objects.get(pk=pk)
-        except MaklerProfil.DoesNotExist:
-            return Response(
-                {'error': 'Rieltor topilmadi'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        serializer = RieltorVerifySerializer(rieltor, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-
-        if request.data.get('verify_holat') == 'verified':
-            rieltor.verify_qilingan_vaqt = timezone.now()
-
-        serializer.save()
-        return Response(RieltorProfilSerializer(rieltor).data)
 
 
 class AdminStatistikaView(APIView):

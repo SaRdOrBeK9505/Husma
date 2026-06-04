@@ -5,9 +5,11 @@ from .models import Ariza, ArizaMakler
 def arizani_rieltorlarga_yuborish(ariza: Ariza) -> int:
     """
     Ariza yuborilganda shu hududdagi
-    verified rieltorlarga avtomatik yuboradi.
+    faol rieltorlarga avtomatik yuboradi.
+    Faol = bepul sinov muddatida YOKI faol obunasi bor.
     Nechta rieltorga yuborilganini qaytaradi.
     """
+    # Avval shu hududdagi barcha verified rieltorlarni olamiz
     rieltorlar = MaklerProfil.objects.filter(
         hududlar=ariza.hudud,
         verify_holat='verified',
@@ -16,6 +18,9 @@ def arizani_rieltorlarga_yuborish(ariza: Ariza) -> int:
 
     yuborildi = 0
     for rieltor in rieltorlar:
+        # Har birining faolligini (bepul muddat yoki obuna) tekshiramiz
+        if not rieltor.faol:
+            continue
         _, created = ArizaMakler.objects.get_or_create(
             ariza=ariza,
             rieltor=rieltor,
