@@ -1,6 +1,6 @@
 from django.db import models
 from apps.users.models import CustomUser
-from apps.hudud.models import Hudud
+from apps.hudud.models import Hudud, Viloyat, MulkTuri
 
 
 class Ariza(models.Model):
@@ -23,6 +23,19 @@ class Ariza(models.Model):
     user = models.ForeignKey(
         CustomUser,
         on_delete=models.CASCADE,
+        related_name='arizalar'
+    )
+    mulk_turi = models.ForeignKey(
+        MulkTuri,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='arizalar'
+    )
+    viloyat = models.ForeignKey(
+        Viloyat,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='arizalar'
     )
     hudud = models.ForeignKey(

@@ -33,7 +33,7 @@ class RieltorProfilView(RetrieveUpdateAPIView):
         return super().get(request, *args, **kwargs)
 
     @extend_schema(
-        summary="Rieltor profilini yangilash (bio, hududlar)",
+        summary="Rieltor profilini yangilash (bio, hududlar, mulk turlari)",
         request=RieltorProfilUpdateSerializer,
         responses={200: RieltorProfilSerializer},
         tags=["Rieltor"],

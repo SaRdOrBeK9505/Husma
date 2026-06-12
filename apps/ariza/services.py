@@ -4,7 +4,7 @@ from .models import Ariza, ArizaMakler
 
 def arizani_rieltorlarga_yuborish(ariza: Ariza) -> int:
     """
-    Ariza yuborilganda shu hududdagi
+    Ariza yuborilganda shu hudud va mulk turi bilan ishlaydigan
     faol rieltorlarga avtomatik yuboradi.
     Faol = bepul sinov muddatida YOKI faol obunasi bor.
     Nechta rieltorga yuborilganini qaytaradi.
@@ -15,6 +15,12 @@ def arizani_rieltorlarga_yuborish(ariza: Ariza) -> int:
         verify_holat='verified',
         user__is_active=True,
     )
+
+    # Mulk turi bo'yicha ham filtrlash (ariza mulk turi ko'rsatilgan bo'lsa)
+    if ariza.mulk_turi_id:
+        rieltorlar = rieltorlar.filter(mulk_turlari=ariza.mulk_turi)
+
+    rieltorlar = rieltorlar.distinct()
 
     yuborildi = 0
     for rieltor in rieltorlar:

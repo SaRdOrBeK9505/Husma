@@ -2,7 +2,7 @@ from django.db import models
 from django.utils import timezone
 from datetime import timedelta
 from apps.users.models import CustomUser
-from apps.hudud.models import Hudud
+from apps.hudud.models import Hudud, MulkTuri
 
 
 class MaklerProfil(models.Model):
@@ -23,6 +23,12 @@ class MaklerProfil(models.Model):
         Hudud,
         blank=True,
         related_name='rieltorlar'
+    )
+    mulk_turlari = models.ManyToManyField(
+        MulkTuri,
+        blank=True,
+        related_name='rieltorlar',
+        help_text="Rieltor qaysi mulk turlari bilan ishlaydi"
     )
     verify_holat = models.CharField(
         max_length=10,

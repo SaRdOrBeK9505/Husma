@@ -11,11 +11,11 @@ class ArizaRieltorInline(admin.TabularInline):
 @admin.register(Ariza)
 class ArizaAdmin(admin.ModelAdmin):
     list_display = [
-        'id', 'user', 'hudud', 'ariza_turi',
+        'id', 'user', 'mulk_turi', 'viloyat', 'hudud', 'ariza_turi',
         'xonalar_soni', 'narx_min', 'narx_max',
         'holat', 'created_at'
     ]
-    list_filter = ['ariza_turi', 'xonalar_soni', 'holat', 'hudud']
+    list_filter = ['mulk_turi', 'viloyat', 'ariza_turi', 'xonalar_soni', 'holat', 'hudud']
     search_fields = ['user__full_name', 'user__telegram_username', 'telefon']
     readonly_fields = ['created_at', 'updated_at']
     inlines = [ArizaRieltorInline]

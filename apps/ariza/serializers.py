@@ -1,7 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
-from apps.hudud.serializers import HududSerializer
+from apps.hudud.serializers import HududSerializer, MulkTuriSerializer
 from .models import Ariza, ArizaMakler
 
 
@@ -34,7 +34,7 @@ class ArizaYaratishSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ariza
         fields = [
-            'id', 'hudud', 'ariza_turi', 'xonalar_soni',
+            'id', 'mulk_turi', 'viloyat', 'hudud', 'ariza_turi', 'xonalar_soni',
             'narx_min', 'narx_max', 'telefon', 'ism', 'qoshimcha_izoh',
         ]
 
@@ -49,6 +49,8 @@ class ArizaYaratishSerializer(serializers.ModelSerializer):
 class ArizaSerializer(serializers.ModelSerializer):
     """Ariza detail ko'rish uchun"""
     hudud = HududSerializer(read_only=True)
+    mulk_turi = MulkTuriSerializer(read_only=True)
+    viloyat_nomi = serializers.CharField(source='viloyat.nomi', read_only=True)
     ariza_turi_display = serializers.CharField(
         source='get_ariza_turi_display', read_only=True
     )
@@ -62,7 +64,8 @@ class ArizaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ariza
         fields = [
-            'id', 'hudud', 'ariza_turi', 'ariza_turi_display',
+            'id', 'mulk_turi', 'viloyat', 'viloyat_nomi', 'hudud',
+            'ariza_turi', 'ariza_turi_display',
             'xonalar_soni', 'xonalar_soni_display',
             'narx_min', 'narx_max', 'telefon', 'ism',
             'qoshimcha_izoh', 'holat', 'holat_display',
@@ -73,6 +76,8 @@ class ArizaSerializer(serializers.ModelSerializer):
 class MaklerArizaSerializer(serializers.ModelSerializer):
     """Rieltor uchun ariza — telefon raqam ko'rinadi"""
     hudud = HududSerializer(read_only=True)
+    mulk_turi = MulkTuriSerializer(read_only=True)
+    viloyat_nomi = serializers.CharField(source='viloyat.nomi', read_only=True)
     user_full_name = serializers.CharField(source='user.full_name', read_only=True)
     ariza_turi_display = serializers.CharField(
         source='get_ariza_turi_display', read_only=True
@@ -85,7 +90,7 @@ class MaklerArizaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ariza
         fields = [
-            'id', 'user_full_name', 'hudud',
+            'id', 'user_full_name', 'mulk_turi', 'viloyat', 'viloyat_nomi', 'hudud',
             'ariza_turi', 'ariza_turi_display',
             'xonalar_soni', 'xonalar_soni_display',
             'narx_min', 'narx_max', 'telefon', 'ism',

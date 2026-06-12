@@ -27,7 +27,7 @@ class RieltorOTPSorovSerializer(serializers.Serializer):
     Rieltor register — 1-qadam.
     Faqat asosiy ma'lumotlar yuboriladi.
     telegram_id request.user dan olinadi (Telegram auth o'tgan bo'lishi shart).
-    Hudud va telegram_link keyinchalik profildan qo'shiladi.
+    Hudud va mulk turlari keyinchalik profildan (patch) qo'shiladi.
     """
     full_name = serializers.CharField(max_length=255)
     phone = serializers.CharField(max_length=20)
