@@ -317,8 +317,8 @@ class RieltorOTPSorovView(APIView):
         summary="Rieltor OTP so'rovi (1-qadam)",
         description=(
             "Telegram auth o'tgan user rieltor bo'lmoqchi bo'lganda chaqiradi. "
-            "Body: full_name, phone, username, password. "
-            "Hudud va telegram_link keyinchalik profildan qo'shiladi. "
+            "Body: full_name, phone, username, password, hududlar, mulk_turlari. "
+            "Hududlar va mulk turlari majburiy (kamida bittadan). "
             "Telegramga 6 xonali tasdiqlash kodi yuboriladi (5 daqiqa amal qiladi)."
         ),
         request=RieltorOTPSorovSerializer,
@@ -366,6 +366,8 @@ class RieltorOTPSorovView(APIView):
                 'phone': data['phone'],
                 'username': data['username'],
                 'password': data['password'],
+                'hududlar': [h.id for h in data['hududlar']],
+                'mulk_turlari': [m.id for m in data['mulk_turlari']],
             }
         )
 
@@ -473,6 +475,14 @@ class RieltorOTPVerifyView(APIView):
             rieltor.verify_holat = MaklerProfil.VerifyHolat.VERIFIED
             rieltor.bepul_muddat_tugash = bepul_muddat
             rieltor.save(update_fields=['verify_holat', 'bepul_muddat_tugash'])
+
+        # Registratsiyada tanlangan hudud va mulk turlarini bog'laymiz
+        hududlar = reg.get('hududlar', [])
+        mulk_turlari = reg.get('mulk_turlari', [])
+        if hududlar:
+            rieltor.hududlar.set(hududlar)
+        if mulk_turlari:
+            rieltor.mulk_turlari.set(mulk_turlari)
 
         otp.delete()
 

@@ -6,24 +6,37 @@ from .models import MaklerProfil
 class RieltorProfilAdmin(admin.ModelAdmin):
     list_display = [
         'user', 'verify_holat', 'faol',
-        'bepul_muddat_tugash', 'obuna_faol', 'obuna_tugash',
+        'bepul_muddat_tugash', 'obuna_faol_display', 'obuna_tugash',
         'ortacha_reyting', 'jami_bitimlar', 'created_at',
     ]
-    list_filter = ['verify_holat', 'obuna_faol']
+    list_filter = ['verify_holat']
     search_fields = ['user__full_name', 'user__telegram_username']
     filter_horizontal = ['hududlar', 'mulk_turlari']
-    readonly_fields = ['ortacha_reyting', 'jami_bitimlar', 'verify_qilingan_vaqt', 'faol']
+    readonly_fields = [
+        'ortacha_reyting', 'jami_bitimlar', 'verify_qilingan_vaqt',
+        'faol', 'obuna_faol_display', 'obuna_tugash',
+    ]
 
-    # Obuna tizimi keyinchalik qo'shiladi — hozir faqat ko'rish
     fieldsets = (
         ('Asosiy', {
-            'fields': ('user', 'bio', 'telegram_link', 'hududlar', 'mulk_turlari', 'verify_holat', 'verify_qilingan_vaqt')
+            'fields': ('user', 'bio', 'telegram_link', 'hududlar', 'mulk_turlari')
+        }),
+        ('Moderatsiya', {
+            'fields': ('verify_holat', 'verify_qilingan_vaqt'),
+            'description': (
+                "verify_holat = 'Bloklangan' qilinsa, obuna/bepul muddatidan "
+                "qat'i nazar rieltor ishlay olmaydi."
+            ),
         }),
         ('Sinov va Obuna', {
-            'fields': ('bepul_muddat_tugash', 'faol', 'obuna_faol', 'obuna_tugash'),
-            'description': "Obuna tizimi keyinchalik to'liq qo'shiladi."
-        }),
-        ('Statistika', {
-            'fields': ('ortacha_reyting', 'jami_bitimlar'),
+            'fields': ('bepul_muddat_tugash', 'faol', 'obuna_faol_display', 'obuna_tugash'),
+            'description': (
+                "Obuna ma'lumotlari 'Obuna' bo'limidan boshqariladi. "
+                "Bu yerda faqat hisoblangan holat ko'rsatiladi."
+            ),
         }),
     )
+
+    @admin.display(boolean=True, description='Obuna faolmi')
+    def obuna_faol_display(self, obj):
+        return obj.obuna_faol

@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'apps.review',
     'apps.kvartira',
     'apps.settings',
+    'apps.obuna',
 ]
 
 MIDDLEWARE = [
@@ -140,6 +141,14 @@ SPECTACULAR_SETTINGS = {
                 }
             }
         },
+    # Bir nechta modelda 'holat' maydoni borligi sababli enum nomlari to'qnashadi.
+    # Har birini aniq nomlash bilan Swagger schema toza chiqadi.
+    'ENUM_NAME_OVERRIDES': {
+        'ArizaHolatEnum': 'apps.ariza.models.Ariza.Holat',
+        'ObunaHolatEnum': 'apps.obuna.models.Obuna.Holat',
+        'TolovHolatEnum': 'apps.obuna.models.Tolov.Holat',
+        'TolovProvayderEnum': 'apps.obuna.models.Tolov.Provayder',
+    },
 }
 
 AUTHENTICATION_BACKENDS = [
@@ -158,6 +167,23 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = True  # Productda o'zgartirish kerak
 
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+
+# ===== PAYME MERCHANT API =====
+# Payme Business kabinetdan olinadi (test: https://test.paycom.uz)
+PAYME_MERCHANT_ID = os.getenv('PAYME_MERCHANT_ID', '')
+# Webhook'ni autentifikatsiya qiluvchi maxfiy kalit (test va prod alohida)
+PAYME_KEY = os.getenv('PAYME_KEY', '')
+# Test rejimi: True bo'lsa test.paycom.uz, False bo'lsa checkout.paycom.uz
+PAYME_TEST_MODE = os.getenv('PAYME_TEST_MODE', 'True') == 'True'
+PAYME_CHECKOUT_URL = (
+    'https://test.paycom.uz' if PAYME_TEST_MODE else 'https://checkout.paycom.uz'
+)
+
+# ===== CLICK (keyinchalik) =====
+CLICK_SERVICE_ID = os.getenv('CLICK_SERVICE_ID', '')
+CLICK_MERCHANT_ID = os.getenv('CLICK_MERCHANT_ID', '')
+CLICK_SECRET_KEY = os.getenv('CLICK_SECRET_KEY', '')
+CLICK_MERCHANT_USER_ID = os.getenv('CLICK_MERCHANT_USER_ID', '')
 
 LANGUAGE_CODE = 'uz'
 TIME_ZONE = 'Asia/Tashkent'

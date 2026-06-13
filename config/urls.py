@@ -17,6 +17,7 @@ urlpatterns = [
     path('api/', include('apps.review.urls')),
     # path('api/', include('apps.kvartira.urls')),
     path('api/', include('apps.settings.urls')),
+    path('api/', include('apps.obuna.urls')),
 
     # Swagger
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

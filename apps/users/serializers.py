@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from apps.hudud.models import Hudud, MulkTuri
 from .models import CustomUser
 
 
@@ -25,14 +26,26 @@ class RieltorLoginSerializer(serializers.Serializer):
 class RieltorOTPSorovSerializer(serializers.Serializer):
     """
     Rieltor register — 1-qadam.
-    Faqat asosiy ma'lumotlar yuboriladi.
     telegram_id request.user dan olinadi (Telegram auth o'tgan bo'lishi shart).
-    Hudud va mulk turlari keyinchalik profildan (patch) qo'shiladi.
+    Hudud va mulk turlari registratsiyada MAJBURIY — shunda rieltor profilni
+    keyin alohida tahrirlashi shart bo'lmaydi va unga darhol ariza tarqatiladi.
     """
     full_name = serializers.CharField(max_length=255)
     phone = serializers.CharField(max_length=20)
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(min_length=6, write_only=True)
+    hududlar = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Hudud.objects.filter(is_active=True),
+        allow_empty=False,
+        help_text="Rieltor ishlaydigan hududlar (kamida bitta)",
+    )
+    mulk_turlari = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=MulkTuri.objects.filter(is_active=True),
+        allow_empty=False,
+        help_text="Rieltor ishlaydigan mulk turlari (kamida bitta)",
+    )
 
     def validate_username(self, value):
         if CustomUser.objects.filter(username=value).exists():
