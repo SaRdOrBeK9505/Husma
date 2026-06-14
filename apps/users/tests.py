@@ -87,6 +87,32 @@ class TelegramAuthTest(APITestCase):
         self.assertEqual(resp.data["user"]["telegram_username"], "ali_uz")
         self.assertEqual(CustomUser.objects.filter(telegram_id=555000111).count(), 1)
 
+    def test_signature_maydoni_hashga_xalaqit_bermaydi(self):
+        """
+        Telegram yangi 'signature' maydonini qo'shadi. U HMAC hash
+        hisobiga kirmasligi kerak. Real initData shu maydon bilan keladi.
+        """
+        init_data = build_init_data(self.tg_user)
+        # Telegram qo'shadigan signature maydonini qo'shamiz
+        init_data = init_data + "&signature=" + "abc123_fake_ed25519_sig"
+        resp = self.client.post(self.url, {"init_data": init_data}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertEqual(resp.data["user"]["telegram_id"], 555000111)
+
+    def test_maxsus_belgili_ism_buzilmaydi(self):
+        """user ichidagi maxsus belgilar (bo'sh joy, +, %) ikki marta
+        decode bo'lib ketmasligi va hash to'g'ri qolishi kerak."""
+        special_user = {
+            "id": 555000999,
+            "first_name": "Ali+Vali",
+            "last_name": "O'g'li 100%",
+            "username": "ali_uz",
+        }
+        init_data = build_init_data(special_user)
+        resp = self.client.post(self.url, {"init_data": init_data}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertEqual(resp.data["user"]["telegram_id"], 555000999)
+
     def test_notogri_hash_rad_etiladi(self):
         init_data = build_init_data(self.tg_user, token="BOSHQA:TOKEN")
         resp = self.client.post(self.url, {"init_data": init_data}, format="json")
