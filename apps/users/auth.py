@@ -1,10 +1,7 @@
 import hashlib
 import hmac
 import time
-import logging
 from django.conf import settings
-
-logger = logging.getLogger("telegram_auth")
 
 
 def verify_telegram_auth(data: dict) -> bool:
@@ -13,20 +10,16 @@ def verify_telegram_auth(data: dict) -> bool:
     """
     token = settings.TELEGRAM_BOT_TOKEN
     if not token:
-        logger.error("TELEGRAM_AUTH: .env da TELEGRAM_BOT_TOKEN yo'q!")
         return False
 
     auth_date = int(data.get('auth_date', 0))
 
     # 24 soatdan eski bo'lsa — rad etish
-    yosh = time.time() - auth_date
-    if yosh > 86400:
-        logger.warning("TELEGRAM_AUTH: auth_date eski (%.0f s). initData eskirgan.", yosh)
+    if time.time() - auth_date > 86400:
         return False
 
     received_hash = data.get('hash')
     if not received_hash:
-        logger.warning("TELEGRAM_AUTH: 'hash' maydoni yo'q. Kalitlar: %s", list(data.keys()))
         return False
 
     # hash va signature ni olib tashlaymiz.
@@ -55,20 +48,7 @@ def verify_telegram_auth(data: dict) -> bool:
         hashlib.sha256
     ).hexdigest()
 
-    if calculated_hash != received_hash:
-        logger.warning(
-            "TELEGRAM_AUTH: HASH MOS EMAS.\n"
-            "  Token oxiri: ...%s\n"
-            "  data_check_string:\n%s\n"
-            "  Kelgan hash:      %s\n"
-            "  Hisoblangan hash: %s\n"
-            "  >>> Sabab odatda: .env token Mini App'ni ochgan botga mos emas.",
-            token[-6:], data_check_string, received_hash, calculated_hash,
-        )
-        return False
-
-    logger.info("TELEGRAM_AUTH: hash mos keldi, verify OK.")
-    return True
+    return calculated_hash == received_hash
 
 
 def parse_webapp_user(init_data: str) -> dict:

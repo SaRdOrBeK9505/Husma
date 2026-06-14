@@ -60,12 +60,6 @@ class TelegramAuthView(APIView):
 
         init_data = serializer.validated_data['init_data']
 
-        # VAQTINCHALIK DIAGNOSTIKA — xom init_data ni logga yozamiz
-        import logging as _lg
-        _lg.getLogger("telegram_auth").warning(
-            "RAW_INIT_DATA (uzunlik=%s):\n%s", len(init_data), init_data
-        )
-
         try:
             parsed = parse_webapp_user(init_data)
         except Exception:
