@@ -2,9 +2,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
-
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# .env ni aniq yo'l bilan yuklaymiz — WSGI boshqa katalogdan ishga tushsa ham
+# (masalan PythonAnywhere'da) fayl topiladi.
+load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'

@@ -18,7 +18,7 @@ from .serializers import (
     RieltorOTPSorovSerializer,
     RieltorOTPVerifySerializer,
 )
-from .auth import verify_telegram_auth, parse_webapp_user
+from .auth import verify_telegram_auth, parse_webapp_user, parse_webapp_user_dict
 
 
 # ===== USER AUTH =====
@@ -74,6 +74,8 @@ class TelegramAuthView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
+        # Verify o'tdi — endi 'user' ni dict ko'rinishida olamiz
+        parsed = parse_webapp_user_dict(init_data)
         tg_user = parsed.get('user', {})
         telegram_id = tg_user.get('id')
 

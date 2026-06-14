@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from drf_spectacular.utils import extend_schema_field
 from .models import Hudud, Viloyat, MulkTuri
 
 
@@ -18,13 +17,6 @@ class HududSerializer(serializers.ModelSerializer):
 
 
 class ViloyatSerializer(serializers.ModelSerializer):
-    hududlar = serializers.SerializerMethodField()
-
     class Meta:
         model = Viloyat
-        fields = ['id', 'nomi', 'hududlar']
-
-    @extend_schema_field(HududSerializer(many=True))
-    def get_hududlar(self, obj):
-        qs = obj.hududlar.filter(is_active=True)
-        return HududSerializer(qs, many=True).data
+        fields = ['id', 'nomi']

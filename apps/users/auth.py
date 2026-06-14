@@ -45,14 +45,27 @@ def verify_telegram_auth(data: dict) -> bool:
 def parse_webapp_user(init_data: str) -> dict:
     """
     Telegram WebApp initData string ni parse qiladi.
+
+    MUHIM: 'user' maydoni XOM JSON string holida qoldiriladi, chunki
+    Telegram hash'ni aynan xom string ustidan hisoblaydi. Agar uni shu yerda
+    dict ga aylantirsak, verify_telegram_auth() hash'ni Python dict repr
+    ustidan hisoblab, hech qachon mos kelmaydi.
+    'user' dict ko'rinishida `parse_webapp_user_dict()` orqali olinadi.
     """
     from urllib.parse import parse_qs, unquote
-    import json
 
     parsed = parse_qs(unquote(init_data))
-    result = {k: v[0] for k, v in parsed.items()}
+    return {k: v[0] for k, v in parsed.items()}
 
+
+def parse_webapp_user_dict(init_data: str) -> dict:
+    """
+    initData ni parse qilib, 'user' maydonini dict ga aylantiradi.
+    Faqat verify_telegram_auth() muvaffaqiyatli o'tgandan keyin chaqiriladi.
+    """
+    import json
+
+    result = parse_webapp_user(init_data)
     if 'user' in result:
         result['user'] = json.loads(result['user'])
-
     return result
