@@ -109,11 +109,30 @@ class Command(BaseCommand):
         for viloyat_nomi, tumanlar in HUDUDLAR.items():
             viloyat = Viloyat.objects.get(nomi=viloyat_nomi)
             for tuman in tumanlar:
-                Hudud.objects.update_or_create(
-                    nomi=tuman,
-                    viloyat=viloyat,
-                    defaults={'shahar': viloyat_nomi, 'is_active': True},
-                )
+                # Dublikatlarga chidamli: avval shu nomli tumanlarni topamiz.
+                mavjud = Hudud.objects.filter(nomi=tuman, viloyat=viloyat)
+                if mavjud.count() > 1:
+                    # Bir nechta dublikat bo'lsa — bittasini qoldirib, qolganini o'chiramiz.
+                    birinchi = mavjud.first()
+                    mavjud.exclude(pk=birinchi.pk).delete()
+                    birinchi.shahar = viloyat_nomi
+                    birinchi.is_active = True
+                    birinchi.save(update_fields=['shahar', 'is_active'])
+                    self.stdout.write(
+                        self.style.WARNING(f"~ dublikat tozalandi: {tuman} ({viloyat_nomi})")
+                    )
+                elif mavjud.count() == 1:
+                    obj = mavjud.first()
+                    obj.shahar = viloyat_nomi
+                    obj.is_active = True
+                    obj.save(update_fields=['shahar', 'is_active'])
+                else:
+                    Hudud.objects.create(
+                        nomi=tuman,
+                        viloyat=viloyat,
+                        shahar=viloyat_nomi,
+                        is_active=True,
+                    )
                 jami_tuman += 1
 
         # Eski, viloyatga bog'lanmagan Toshkent tumanlarini bog'laymiz

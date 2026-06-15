@@ -5,19 +5,31 @@ from datetime import timedelta
 
 
 class CustomUserManager(BaseUserManager):
-    def create_user(self, telegram_id, **extra_fields):
-        if not telegram_id:
-            raise ValueError('Telegram ID majburiy')
+    def create_user(self, telegram_id=None, password=None, **extra_fields):
+        # Admin (superuser) telegram_id'siz ham yaratilishi mumkin —
+        # u username/parol bilan kiradi. Oddiy foydalanuvchi uchun
+        # telegram_id majburiy.
         user = self.model(telegram_id=telegram_id, **extra_fields)
-        user.set_unusable_password()
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, telegram_id, **extra_fields):
+    def create_superuser(self, telegram_id=None, password=None, **extra_fields):
         extra_fields.setdefault('role', 'admin')
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        return self.create_user(telegram_id, **extra_fields)
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser is_staff=True bo\'lishi kerak')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser is_superuser=True bo\'lishi kerak')
+        if not password:
+            raise ValueError('Superuser uchun parol majburiy')
+
+        return self.create_user(telegram_id, password=password, **extra_fields)
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):

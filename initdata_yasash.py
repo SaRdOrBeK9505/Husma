@@ -59,6 +59,13 @@ def main():
     print("\n--- Faqat initData string ---\n")
     print(init_data)
 
+    # Faylga ham yozamiz — terminaldan nusxalaganda satr uzilishi bo'lmasligi uchun.
+    # initdata.txt ni ochib, ichidagini Swagger body'ga to'liq qo'ying.
+    with open("initdata.txt", "w", encoding="utf-8") as f:
+        f.write(json.dumps({"init_data": init_data}, ensure_ascii=False))
+    print("\n>>> 'initdata.txt' fayliga ham yozildi. O'shani ochib, ichidagini")
+    print(">>> to'liq nusxalab Swagger body'ga qo'ying (satr uzilishisiz).")
+
 
 if __name__ == "__main__":
     main()
