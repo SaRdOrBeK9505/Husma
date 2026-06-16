@@ -22,33 +22,29 @@ def verify_telegram_auth(data: dict) -> bool:
     if not received_hash:
         return False
 
-    # hash va signature ni olib tashlaymiz.
-    # 'signature' — Telegram qo'shgan yangi maydon (uchinchi tomon Ed25519
-    # validatsiyasi uchun). U data_check_string ga KIRMASLIGI kerak,
-    # aks holda bot-token HMAC hash mos kelmaydi.
-    data_check = {
-        k: v for k, v in data.items() if k not in ('hash', 'signature')
-    }
-
-    # Satrni tartib bilan yasaymiz
-    data_check_string = '\n'.join(
-        f"{k}={v}" for k, v in sorted(data_check.items())
-    )
-
-    # HMAC-SHA256
     secret_key = hmac.new(
         b'WebAppData',
         token.encode(),
         hashlib.sha256
     ).digest()
 
-    calculated_hash = hmac.new(
-        secret_key,
-        data_check_string.encode(),
-        hashlib.sha256
-    ).hexdigest()
+    def _hash_for(keys_to_exclude):
+        check = {k: v for k, v in data.items() if k not in keys_to_exclude}
+        dcs = '\n'.join(f"{k}={v}" for k, v in sorted(check.items()))
+        return hmac.new(secret_key, dcs.encode(), hashlib.sha256).hexdigest()
 
-    return calculated_hash == received_hash
+    # Telegram'ning turli klient/versiyalari hash'ni har xil hisoblaydi:
+    #  1) Standart (hujjat bo'yicha): hash va signature data_check_string'dan
+    #     CHIQARIB tashlanadi.
+    #  2) Ba'zi klientlar (yangi Android va b.): signature data_check_string
+    #     ICHIDA QOLADI, faqat hash chiqariladi.
+    # Ikkala variantni ham sinaymiz — qaysidir biri mos kelsa, haqiqiy.
+    if _hash_for(('hash', 'signature')) == received_hash:
+        return True
+    if _hash_for(('hash',)) == received_hash:
+        return True
+
+    return False
 
 
 def parse_webapp_user(init_data: str) -> dict:
