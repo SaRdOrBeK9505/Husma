@@ -26,6 +26,33 @@ import json as _json
 _auth_log = _logging.getLogger("telegram_auth")
 
 
+class RequestLogMixin:
+    """
+    APIView uchun: kelgan request va qaytgan javob statusini loglaydi.
+    `log_nomi` atributini view'da belgilang.
+    """
+    log_nomi = "REQUEST"
+
+    def initial(self, request, *args, **kwargs):
+        # View logikasidan oldin — kelgan so'rovni loglaymiz
+        _log_request(request, self.log_nomi)
+        return super().initial(request, *args, **kwargs)
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        # Javob tayyor bo'lgach — status kodni loglaymiz
+        response = super().finalize_response(request, response, *args, **kwargs)
+        try:
+            tana = response.data
+        except Exception:
+            tana = None
+        _auth_log.info(
+            "  >>> [%s] JAVOB STATUS: %s | tana: %s",
+            self.log_nomi, response.status_code,
+            _json.dumps(tana, ensure_ascii=False, default=str) if tana is not None else "—",
+        )
+        return response
+
+
 def _log_request(request, endpoint_nomi: str):
     """Kelgan request ma'lumotlarini to'liq logga yozadi (diagnostika)."""
     try:
@@ -69,8 +96,9 @@ def _log_request(request, endpoint_nomi: str):
 
 # ===== USER AUTH =====
 
-class TelegramAuthView(APIView):
+class TelegramAuthView(RequestLogMixin, APIView):
     permission_classes = [AllowAny]
+    log_nomi = "TELEGRAM AUTH"
 
     @extend_schema(
         summary="Telegram orqali login",
@@ -101,8 +129,6 @@ class TelegramAuthView(APIView):
         tags=["Auth"],
     )
     def post(self, request):
-        _log_request(request, "TELEGRAM AUTH")
-
         serializer = TelegramAuthSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -214,8 +240,9 @@ class StatistikaView(APIView):
 
 # ===== RIELTOR AUTH =====
 
-class RieltorLoginView(APIView):
+class RieltorLoginView(RequestLogMixin, APIView):
     permission_classes = [AllowAny]
+    log_nomi = "RIELTOR LOGIN"
 
     @extend_schema(
         summary="Rieltor kirish",
@@ -245,7 +272,6 @@ class RieltorLoginView(APIView):
         tags=["Auth"],
     )
     def post(self, request):
-        _log_request(request, "RIELTOR LOGIN")
         serializer = RieltorLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -355,7 +381,7 @@ class RieltorFaollikView(APIView):
 
 # ===== OTP ORQALI RIELTOR REGISTER =====
 
-class RieltorOTPSorovView(APIView):
+class RieltorOTPSorovView(RequestLogMixin, APIView):
     """
     Rieltor register — 1-qadam.
     Telegram auth o'tgan user JWT bilan murojaat qiladi.
@@ -363,6 +389,7 @@ class RieltorOTPSorovView(APIView):
     Telegramga 6 xonali OTP kodi yuboriladi.
     """
     permission_classes = [IsAuthenticated]
+    log_nomi = "RIELTOR OTP SO'ROV"
 
     @extend_schema(
         summary="Rieltor OTP so'rovi (1-qadam)",
@@ -388,7 +415,6 @@ class RieltorOTPSorovView(APIView):
         tags=["Auth"],
     )
     def post(self, request):
-        _log_request(request, "RIELTOR OTP SO'ROV")
         telegram_id = request.user.telegram_id
         if not telegram_id:
             return Response(
@@ -436,13 +462,14 @@ class RieltorOTPSorovView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-class RieltorOTPVerifyView(APIView):
+class RieltorOTPVerifyView(RequestLogMixin, APIView):
     """
     Rieltor register — 2-qadam.
     Telegram auth o'tgan user JWT bilan kode yuboradi.
     To'g'ri bo'lsa user makler roliga o'tadi, MaklerProfil yaratiladi.
     """
     permission_classes = [IsAuthenticated]
+    log_nomi = "RIELTOR OTP VERIFY"
 
     @extend_schema(
         summary="Rieltor OTP tasdiqlash (2-qadam)",
@@ -476,7 +503,6 @@ class RieltorOTPVerifyView(APIView):
         tags=["Auth"],
     )
     def post(self, request):
-        _log_request(request, "RIELTOR OTP VERIFY")
         telegram_id = request.user.telegram_id
         if not telegram_id:
             return Response(
