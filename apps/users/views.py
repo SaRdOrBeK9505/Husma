@@ -20,6 +20,52 @@ from .serializers import (
 )
 from .auth import verify_telegram_auth, parse_webapp_user, parse_webapp_user_dict
 
+import logging as _logging
+import json as _json
+
+_auth_log = _logging.getLogger("telegram_auth")
+
+
+def _log_request(request, endpoint_nomi: str):
+    """Kelgan request ma'lumotlarini to'liq logga yozadi (diagnostika)."""
+    try:
+        raw_body = request.body.decode('utf-8', errors='replace')
+    except Exception:
+        raw_body = "<o'qib bo'lmadi>"
+    try:
+        data_str = (
+            _json.dumps(dict(request.data), ensure_ascii=False)
+            if hasattr(request.data, 'items') else str(request.data)
+        )
+    except Exception:
+        data_str = str(request.data)
+
+    foydalanuvchi = "—"
+    if getattr(request, 'user', None) and request.user.is_authenticated:
+        foydalanuvchi = f"id={request.user.id}, tg_id={request.user.telegram_id}, role={request.user.role}"
+
+    _auth_log.info(
+        "\n========== %s ==========\n"
+        "  Method        : %s\n"
+        "  Content-Type  : %s\n"
+        "  Origin        : %s\n"
+        "  Referer       : %s\n"
+        "  User-Agent    : %s\n"
+        "  Auth user     : %s\n"
+        "  request.data  : %s\n"
+        "  XOM BODY      : %s\n"
+        "==========================================",
+        endpoint_nomi,
+        request.method,
+        request.content_type,
+        request.headers.get('Origin', '—'),
+        request.headers.get('Referer', '—'),
+        request.headers.get('User-Agent', '—'),
+        foydalanuvchi,
+        data_str,
+        raw_body,
+    )
+
 
 # ===== USER AUTH =====
 
@@ -55,34 +101,7 @@ class TelegramAuthView(APIView):
         tags=["Auth"],
     )
     def post(self, request):
-        # ===== TO'LIQ REQUEST DIAGNOSTIKA LOG =====
-        import logging as _logging
-        import json as _json
-        _log = _logging.getLogger("telegram_auth")
-        try:
-            _raw_body = request.body.decode('utf-8', errors='replace')
-        except Exception:
-            _raw_body = "<o'qib bo'lmadi>"
-        _log.info(
-            "\n========== TELEGRAM AUTH REQUEST ==========\n"
-            "  Method        : %s\n"
-            "  Content-Type  : %s\n"
-            "  Origin        : %s\n"
-            "  Referer       : %s\n"
-            "  User-Agent    : %s\n"
-            "  request.data  : %s\n"
-            "  init_data     : %s\n"
-            "  XOM BODY      : %s\n"
-            "===========================================",
-            request.method,
-            request.content_type,
-            request.headers.get('Origin', '—'),
-            request.headers.get('Referer', '—'),
-            request.headers.get('User-Agent', '—'),
-            _json.dumps(dict(request.data), ensure_ascii=False) if hasattr(request.data, 'items') else str(request.data),
-            request.data.get('init_data', '<YO\'Q>') if hasattr(request.data, 'get') else '<dict emas>',
-            _raw_body,
-        )
+        _log_request(request, "TELEGRAM AUTH")
 
         serializer = TelegramAuthSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -226,6 +245,7 @@ class RieltorLoginView(APIView):
         tags=["Auth"],
     )
     def post(self, request):
+        _log_request(request, "RIELTOR LOGIN")
         serializer = RieltorLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -368,6 +388,7 @@ class RieltorOTPSorovView(APIView):
         tags=["Auth"],
     )
     def post(self, request):
+        _log_request(request, "RIELTOR OTP SO'ROV")
         telegram_id = request.user.telegram_id
         if not telegram_id:
             return Response(
@@ -455,6 +476,7 @@ class RieltorOTPVerifyView(APIView):
         tags=["Auth"],
     )
     def post(self, request):
+        _log_request(request, "RIELTOR OTP VERIFY")
         telegram_id = request.user.telegram_id
         if not telegram_id:
             return Response(
