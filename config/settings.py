@@ -199,3 +199,39 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ===== LOGGING — Telegram auth request diagnostikasi =====
+# 'telegram_auth' logger barcha kelgan request body / header larni
+# logs/telegram_auth.log fayliga va konsolga yozadi.
+LOGS_DIR = BASE_DIR / 'logs'
+LOGS_DIR.mkdir(exist_ok=True)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{asctime} [{levelname}] {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'telegram_auth_file': {
+            'class': 'logging.FileHandler',
+            'filename': str(LOGS_DIR / 'telegram_auth.log'),
+            'encoding': 'utf-8',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'telegram_auth': {
+            'handlers': ['console', 'telegram_auth_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

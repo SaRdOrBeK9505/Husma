@@ -55,6 +55,35 @@ class TelegramAuthView(APIView):
         tags=["Auth"],
     )
     def post(self, request):
+        # ===== TO'LIQ REQUEST DIAGNOSTIKA LOG =====
+        import logging as _logging
+        import json as _json
+        _log = _logging.getLogger("telegram_auth")
+        try:
+            _raw_body = request.body.decode('utf-8', errors='replace')
+        except Exception:
+            _raw_body = "<o'qib bo'lmadi>"
+        _log.info(
+            "\n========== TELEGRAM AUTH REQUEST ==========\n"
+            "  Method        : %s\n"
+            "  Content-Type  : %s\n"
+            "  Origin        : %s\n"
+            "  Referer       : %s\n"
+            "  User-Agent    : %s\n"
+            "  request.data  : %s\n"
+            "  init_data     : %s\n"
+            "  XOM BODY      : %s\n"
+            "===========================================",
+            request.method,
+            request.content_type,
+            request.headers.get('Origin', '—'),
+            request.headers.get('Referer', '—'),
+            request.headers.get('User-Agent', '—'),
+            _json.dumps(dict(request.data), ensure_ascii=False) if hasattr(request.data, 'items') else str(request.data),
+            request.data.get('init_data', '<YO\'Q>') if hasattr(request.data, 'get') else '<dict emas>',
+            _raw_body,
+        )
+
         serializer = TelegramAuthSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
