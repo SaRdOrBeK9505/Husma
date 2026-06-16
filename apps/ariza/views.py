@@ -17,7 +17,7 @@ from .services import arizani_maklerlarga_yuborish
 
 
 class ArizaYaratishView(CreateAPIView):
-    permission_classes = [IsUser]
+    permission_classes = [IsUser, IsVerifiedRieltor]
     serializer_class = ArizaYaratishSerializer
 
     @extend_schema(
