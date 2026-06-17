@@ -10,14 +10,14 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiRespon
 from drf_spectacular.types import OpenApiTypes
 from rest_framework import serializers as drf_serializers
 
-from core.permissions import IsUser, IsVerifiedRieltor, IsAdmin
+from core.permissions import IsUser, IsVerifiedRieltor, IsAdmin, IsUserOrRieltor
 from .models import Ariza, ArizaMakler
 from .serializers import ArizaYaratishSerializer, ArizaSerializer, MaklerArizaSerializer
 from .services import arizani_maklerlarga_yuborish
 
 
 class ArizaYaratishView(CreateAPIView):
-    permission_classes = [IsUser]
+    permission_classes = [IsUserOrRieltor]
     serializer_class = ArizaYaratishSerializer
 
     @extend_schema(
@@ -37,7 +37,7 @@ class ArizaYaratishView(CreateAPIView):
 
 
 class UserArizalarView(ListAPIView):
-    permission_classes = [IsUser]
+    permission_classes = [IsUserOrRieltor]
     serializer_class = ArizaSerializer
     queryset = Ariza.objects.none()
 
@@ -81,7 +81,7 @@ class UserArizalarView(ListAPIView):
 
 class UserArizaDetailView(RetrieveUpdateDestroyAPIView):
     """User bitta arizasini ko'rish, tahrirlash, o'chirish"""
-    permission_classes = [IsUser]
+    permission_classes = [IsUserOrRieltor]
     queryset = Ariza.objects.none()
 
     def get_serializer_class(self):

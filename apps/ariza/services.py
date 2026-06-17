@@ -20,6 +20,10 @@ def arizani_rieltorlarga_yuborish(ariza: Ariza) -> int:
         verify_holat=MaklerProfil.VerifyHolat.REJECTED,
     )
 
+    # Agar arizani rieltor yuborayotgan bo'lsa, o'zini chiqarib tashlaymiz
+    if ariza.user.role == 'makler':
+        rieltorlar = rieltorlar.exclude(user=ariza.user)
+
     # Mulk turi bo'yicha ham filtrlash (ariza mulk turi ko'rsatilgan bo'lsa)
     if ariza.mulk_turi_id:
         rieltorlar = rieltorlar.filter(mulk_turlari=ariza.mulk_turi)

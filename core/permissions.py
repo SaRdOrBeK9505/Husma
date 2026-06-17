@@ -58,6 +58,17 @@ class IsAdminOrRieltor(BasePermission):
         )
 
 
+
+class IsUserOrRieltor(BasePermission):
+    message = 'Faqat foydalanuvchilar yoki rieltorlar uchun'
+
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated
+            and request.user.role in ['user', 'makler']
+        )
+
+
 # Backward compatibility uchun alias'lar
 IsMakler = IsRieltor
 IsVerifiedMakler = IsVerifiedRieltor
