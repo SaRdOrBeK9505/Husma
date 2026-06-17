@@ -2,14 +2,17 @@ from rest_framework.generics import RetrieveUpdateAPIView, ListAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from core.permissions import IsRieltor, IsAdmin
 from .models import MaklerProfil, CustomUser
 from .serializers import (
     RieltorProfilSerializer,
     RieltorProfilUpdateSerializer,
+    RieltorLoginSerializer,
+    RieltorLoginResponseSerializer,
 )
 
 
@@ -42,6 +45,85 @@ class RieltorProfilView(RetrieveUpdateAPIView):
         return super().partial_update(request, *args, **kwargs)
 
 
+class RieltorLoginView(APIView):
+    """
+    Telegram auth orqali olingan token bilan rieltor profilini tasdiqlash.
+    Yangi token CHIQARILMAYDI — joriy token davom etadi.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Rieltor sifatida kirish (token yangilanmaydi)",
+        description=(
+            "Telegram auth orqali olingan Bearer token bilan so'rov yuboring. "
+            "Bu endpoint username/parolni tekshirib, rieltor profilini qaytaradi. "
+            "Yangi token **chiqarilmaydi** — mavjud token bilan ishlashda davom etiladi."
+        ),
+        request=RieltorLoginSerializer,
+        responses={
+            200: RieltorLoginResponseSerializer,
+            400: OpenApiResponse(description="Username/parol noto'g'ri yoki bo'sh"),
+            403: OpenApiResponse(description="Profil admin tomonidan bloklangan"),
+            404: OpenApiResponse(description="Rieltor profili topilmadi"),
+        },
+        tags=["Rieltor"],
+        examples=[
+            OpenApiExample(
+                name="Muvaffaqiyatli tasdiqlash",
+                value={
+                    "message": "Rieltor sifatida tasdiqlandi",
+                    "rieltor": {
+                        "id": 1,
+                        "bio": "Professional rieltor",
+                        "verify_holat": "verified",
+                        "faol": True,
+                    }
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
+    def post(self, request):
+        serializer = RieltorLoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        username = serializer.validated_data['username']
+        password = serializer.validated_data['password']
+
+        # username/parol joriy (telegram orqali aniqlangan) userga tegishli ekanini tekshiramiz
+        if request.user.username != username or not request.user.check_password(password):
+            return Response(
+                {'error': "Username yoki parol noto'g'ri"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        rieltor_profil = getattr(request.user, 'rieltor_profil', None)
+        if rieltor_profil is None:
+            return Response(
+                {'error': "Bu hisobda rieltor profili topilmadi"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if rieltor_profil.bloklangan:
+            return Response(
+                {'error': "Profilingiz admin tomonidan bloklangan"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # MUHIM: yangi token chiqarilmaydi — joriy (telegram auth'dan kelgan) token davom etadi
+        return Response({
+            'message': "Rieltor sifatida tasdiqlandi",
+            'rieltor': {
+                'id': rieltor_profil.id,
+                'bio': rieltor_profil.bio,
+                'verify_holat': rieltor_profil.verify_holat,
+                'faol': rieltor_profil.faol,
+            }
+        }, status=status.HTTP_200_OK)
+
+
 class AdminRieltorListView(ListAPIView):
     permission_classes = [IsAdmin]
     serializer_class = RieltorProfilSerializer
@@ -56,7 +138,6 @@ class AdminRieltorListView(ListAPIView):
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
-
 
 
 class AdminStatistikaView(APIView):

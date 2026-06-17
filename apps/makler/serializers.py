@@ -43,6 +43,31 @@ class RieltorVerifySerializer(serializers.ModelSerializer):
         fields = ['verify_holat']
 
 
+class RieltorLoginSerializer(serializers.Serializer):
+    """Rieltor login so'rovi uchun (Swagger docs)"""
+    username = serializers.CharField(
+        help_text="Telegram orqali ro'yxatdan o'tgan username"
+    )
+    password = serializers.CharField(
+        write_only=True,
+        style={'input_type': 'password'},
+        help_text="Foydalanuvchi paroli"
+    )
+
+
+class RieltorLoginResponseSerializer(serializers.Serializer):
+    """Rieltor login muvaffaqiyatli javob uchun (Swagger docs)"""
+    message = serializers.CharField()
+
+    class RieltorInfoSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+        bio = serializers.CharField(allow_null=True)
+        verify_holat = serializers.CharField()
+        faol = serializers.BooleanField()
+
+    rieltor = RieltorInfoSerializer()
+
+
 # Backward compatibility
 MaklerProfilSerializer = RieltorProfilSerializer
 MaklerProfilUpdateSerializer = RieltorProfilUpdateSerializer

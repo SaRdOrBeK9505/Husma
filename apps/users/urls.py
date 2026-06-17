@@ -19,7 +19,7 @@ urlpatterns = [
     path('auth/rieltor/otp-verify/', RieltorOTPVerifyView.as_view(), name='rieltor-otp-verify'),
 
     # ===== RIELTOR LOGIN =====
-    path('auth/rieltor/login/', RieltorLoginView.as_view(), name='rieltor-login'),
+    # path('auth/rieltor/login/', RieltorLoginView.as_view(), name='rieltor-login'),
     path('auth/rieltor/faollik/', RieltorFaollikView.as_view(), name='rieltor-faollik'),
 
     # ===== UMUMIY =====
