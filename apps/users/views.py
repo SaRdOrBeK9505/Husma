@@ -136,13 +136,18 @@ class TelegramAuthView(RequestLogMixin, APIView):
 
         try:
             parsed = parse_webapp_user(init_data)
-        except Exception:
+            _auth_log.info(f"initData parse qilindi: keys={list(parsed.keys())}")
+        except Exception as e:
+            _auth_log.error(f"initData parse xatosi: {e}", exc_info=True)
             return Response(
                 {'error': "initData noto'g'ri formatda"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if not verify_telegram_auth(parsed):
+        auth_result = verify_telegram_auth(parsed)
+        _auth_log.info(f"Telegram auth verification: {auth_result}")
+
+        if not auth_result:
             return Response(
                 {'error': 'Telegram autentifikatsiya muvaffaqiyatsiz'},
                 status=status.HTTP_401_UNAUTHORIZED
@@ -167,6 +172,8 @@ class TelegramAuthView(RequestLogMixin, APIView):
             }
         )
 
+        _auth_log.info(f"User {'yaratildi' if created else 'topildi'}: id={user.id}, telegram_id={user.telegram_id}, is_active={user.is_active}")
+
         if not created:
             user.telegram_username = tg_user.get('username', user.telegram_username)
             user.full_name = (
@@ -175,7 +182,15 @@ class TelegramAuthView(RequestLogMixin, APIView):
             )
             user.save(update_fields=['telegram_username', 'full_name'])
 
-        refresh = RefreshToken.for_user(user)
+        try:
+            refresh = RefreshToken.for_user(user)
+            _auth_log.info(f"JWT token yaratildi: user_id={user.id}")
+        except Exception as e:
+            _auth_log.error(f"JWT token yaratishda xato: {e}", exc_info=True)
+            return Response(
+                {'error': f'Token yaratishda xato: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         return Response({
             'access': str(refresh.access_token),

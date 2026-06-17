@@ -23,5 +23,5 @@ urlpatterns = [
     path('rieltor/arizalar/<int:pk>/yopish/', RieltorArizaYopishView.as_view(), name='rieltor-ariza-yopish'),
 
     # Admin
-    # path('admin/arizalar/', AdminArizalarView.as_view(), name='admin-arizalar'),
+    path('admin/arizalar/', AdminArizalarView.as_view(), name='admin-arizalar'),
 ]
