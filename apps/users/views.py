@@ -490,7 +490,8 @@ class RieltorOTPVerifyView(RequestLogMixin, APIView):
         summary="Rieltor OTP tasdiqlash (2-qadam)",
         description=(
             "Telegramga kelgan 6 xonali kode yuboriladi. "
-            "Muvaffaqiyatli bo'lsa rieltor yaratiladi, 7 kunlik bepul muddat boshlanadi."
+            "Muvaffaqiyatli bo'lsa rieltor yaratiladi, 7 kunlik bepul muddat boshlanadi. "
+            "**Yangi token chiqarilmaydi** — Telegram auth'dan kelgan token davom etadi."
         ),
         request=RieltorOTPVerifySerializer,
         responses={
@@ -500,8 +501,6 @@ class RieltorOTPVerifyView(RequestLogMixin, APIView):
                     name="Success",
                     value={
                         "message": "Ro'yxatdan o'tdingiz. 7 kunlik bepul sinov muddati boshlandi.",
-                        "access": "eyJ...",
-                        "refresh": "eyJ...",
                         "rieltor": {
                             "id": 1,
                             "username": "ali_rieltor",
@@ -580,13 +579,10 @@ class RieltorOTPVerifyView(RequestLogMixin, APIView):
 
         otp.delete()
 
-        # Role o'zgargani uchun yangi JWT
-        refresh = RefreshToken.for_user(user)
-
+        # MUHIM: yangi token CHIQARILMAYDI — telegram auth'dan kelgan token davom etadi.
+        # SimpleJWT faqat user_id saqlaydi, role DBdan o'qiladi → eski token ishlayveradi.
         return Response({
             "message": "Ro'yxatdan o'tdingiz. 7 kunlik bepul sinov muddati boshlandi.",
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
             "rieltor": {
                 "id": user.id,
                 "username": user.username,
