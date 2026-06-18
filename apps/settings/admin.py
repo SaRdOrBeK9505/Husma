@@ -8,9 +8,8 @@ class SiteSettingsAdmin(admin.ModelAdmin):
         ('🖼 Hero Banner', {
             'fields': ('hero_sarlavha', 'hero_tavsif', 'hero_rasm'),
         }),
-        ('📊 Statistika', {
-            'fields': ('stat_bitimlar', 'stat_rieltor', 'stat_javob_vaqti'),
-        }),
+        # 📊 Statistika maydonlari olib tashlandi — endi /api/statistika/
+        # endpoint'i DB dan real-time hisoblab beradi (ArizaMakler va MaklerProfil dan).
         ('💰 Minimal Komissiya Banner', {
             'fields': ('komissiya_foiz', 'komissiya_tavsif'),
         }),
@@ -75,8 +74,15 @@ class KontaktMalumotAdmin(admin.ModelAdmin):
 class UserStatistikaAdmin(admin.ModelAdmin):
     fieldsets = (
         ("📊 User paneli statistikasi", {
-            'fields': ('bitimlar', 'rieltor_soni', 'javob_vaqti'),
-            'description': "Frontendda '500+', '50+', '2s' ko'rinishida chiqadi"
+            'fields': ('javob_vaqti',),
+            'description': (
+                "Javob vaqti frontendda '2s', '5min' ko'rinishida chiqadi. "
+                "Bitimlar soni va rieltorlar soni endi DB dan real-time hisoblanadi "
+                "(ArizaMakler.holat='boglandi' va MaklerProfil.verify_holat='verified')."
+            )
+        }),
+        ("ℹ️ Ma'lumot", {
+            'fields': ('updated_at',),
         }),
     )
     readonly_fields = ('updated_at',)
