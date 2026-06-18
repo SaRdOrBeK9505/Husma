@@ -8,6 +8,7 @@ from datetime import timedelta
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from apps.ariza.models import Ariza
+from apps.ariza.services import yangi_rieltorga_eski_arizalarni_biriktir
 from apps.makler.models import MaklerProfil
 from .models import CustomUser, OTPKode
 from .otp_service import kode_generatsiya, otp_yuborish
@@ -576,6 +577,11 @@ class RieltorOTPVerifyView(RequestLogMixin, APIView):
             rieltor.hududlar.set(hududlar)
         if mulk_turlari:
             rieltor.mulk_turlari.set(mulk_turlari)
+
+        # Yangi rieltorga oxirgi 30 kun ichidagi mos ochiq arizalarni biriktirish.
+        # MUHIM: bu qatorlar hududlar.set() va mulk_turlari.set() dan KEYIN turishi shart,
+        # chunki funksiya aynan shu ManyToMany maydonlar bo'yicha filtrlaydi.
+        yangi_rieltorga_eski_arizalarni_biriktir(rieltor)
 
         otp.delete()
 
