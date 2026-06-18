@@ -18,6 +18,8 @@ class ArizaAdmin(admin.ModelAdmin):
     list_filter = ['mulk_turi', 'viloyat', 'ariza_turi', 'xonalar_soni', 'holat', 'hudud']
     search_fields = ['user__full_name', 'user__telegram_username', 'telefon']
     readonly_fields = ['created_at', 'updated_at']
+    # list_display dagi FK lar uchun N+1 oldini olish
+    list_select_related = ['user', 'mulk_turi', 'viloyat', 'hudud']
     inlines = [ArizaRieltorInline]
 
 
@@ -25,3 +27,4 @@ class ArizaAdmin(admin.ModelAdmin):
 class ArizaRieltorAdmin(admin.ModelAdmin):
     list_display = ['ariza', 'rieltor', 'holat', 'created_at']
     list_filter = ['holat']
+    list_select_related = ['ariza', 'rieltor']

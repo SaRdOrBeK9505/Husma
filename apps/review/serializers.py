@@ -96,14 +96,26 @@ class IjobiyReviewSerializer(serializers.ModelSerializer):
         """
         Userni oxirgi arizasidan xonalar soni + hudud nomi.
         Masalan: '2-xonali, Yunusobod tumani'
+
+        MUHIM: N+1 oldini olish uchun IjobiyReviewlarView da
+        Prefetch('user__arizalar', ...) ishlatilishi shart.
+        Bu yerda to'g'ridan DB so'rovi yo'q — prefetch cache dan o'qiladi.
         """
-        ariza = (
-            Ariza.objects
-            .filter(user=obj.user)
-            .select_related('hudud')
-            .order_by('-created_at')
-            .first()
-        )
+        # prefetch cache dan foydalanish:
+        # view da prefetch_related('user__arizalar') bo'lishi shart
+        user_arizalar = getattr(obj.user, '_prefetched_objects_cache', {}).get('arizalar')
+        if user_arizalar is not None:
+            # Prefetch cache mavjud — Python da saralash (DB ga so'rov ketmaydi)
+            ariza = next(iter(user_arizalar), None)
+        else:
+            # Fallback: prefetch bo'lmasa oddiy so'rov (xavfsiz lekin sekinroq)
+            ariza = (
+                Ariza.objects
+                .filter(user=obj.user)
+                .select_related('hudud')
+                .order_by('-created_at')
+                .first()
+            )
         if ariza and ariza.hudud:
             return f"{ariza.xonalar_soni}-xonali, {ariza.hudud.nomi}"
         elif ariza:

@@ -4,9 +4,11 @@ from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from rest_framework import status
 from rest_framework.permissions import AllowAny
+from django.db.models import Prefetch
 from drf_spectacular.utils import extend_schema
 
 from core.permissions import IsUser
+from apps.ariza.models import Ariza
 from apps.makler.models import MaklerProfil
 from .models import Review
 from .serializers import (
@@ -80,7 +82,7 @@ class RieltorReytingView(APIView):
     )
     def get(self, request, rieltor_id):
         try:
-            rieltor = MaklerProfil.objects.get(pk=rieltor_id)
+            rieltor = MaklerProfil.objects.select_related('user').get(pk=rieltor_id)
         except MaklerProfil.DoesNotExist:
             return Response(
                 {'error': 'Rieltor topilmadi'},
@@ -133,9 +135,22 @@ class IjobiyReviewlarView(ListAPIView):
     permission_classes = [AllowAny]
     serializer_class = IjobiyReviewSerializer
     pagination_class = ReviewPagination
-    queryset = Review.objects.filter(yulduz__gte=4).select_related(
-        'user', 'rieltor__user'
-    ).order_by('-created_at')
+
+    def get_queryset(self):
+        # N+1 oldini olish:
+        # 1. select_related('user', 'rieltor__user') — Review uchun FK lar
+        # 2. Prefetch('user__arizalar') — har user uchun oxirgi arizani oldindan yuklaymiz.
+        #    ordering='-created_at' bo'lgani uchun birinchi element — eng oxirgi ariza.
+        #    Serializer da _prefetched_objects_cache dan foydalanadi (DB so'rovsiz).
+        user_arizalar_prefetch = Prefetch(
+            'user__arizalar',
+            queryset=Ariza.objects.select_related('hudud').order_by('-created_at'),
+        )
+        return Review.objects.filter(yulduz__gte=4).select_related(
+            'user', 'rieltor__user'
+        ).prefetch_related(
+            user_arizalar_prefetch
+        ).order_by('-created_at')
 
     @extend_schema(
         summary="Ijobiy reviewlar — Mijozlar fikrlari",

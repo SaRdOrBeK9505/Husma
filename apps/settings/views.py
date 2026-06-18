@@ -167,30 +167,54 @@ class SiteSettingsView(APIView):
         return Response(serializer.data)
 
 
-# ===== USER STATISTIKASI (static) =====
+# ===== USER STATISTIKASI (dynamic) =====
 
 class UserStatistikaView(APIView):
-    """User paneli — 500+ Bitimlar, 50+ Rieltor, 2s Javob"""
+    """
+    User paneli — bitimlar va rieltor_soni DB'dan real hisoblanadi.
+    javob_vaqti admin nazoratida (UserStatistika modelidan).
+    """
     permission_classes = [AllowAny]
 
     @extend_schema(
         summary="User paneli statistikasi",
-        description="Statik statistika: jami bitimlar, rieltorlar soni, javob vaqti",
+        description=(
+            "Dinamik statistika: bitimlar va rieltor_soni bazadan real hisoblanadi. "
+            "javob_vaqti admin tomonidan kiritilgan."
+        ),
         responses={200: UserStatistikaSerializer},
         tags=["Settings"],
     )
     def get(self, request):
+        from apps.makler.models import MaklerProfil
+
+        # Yopilgan (bog'langan) bitimlar soni — ArizaMakler'dan real hisob
+        bitimlar = ArizaMakler.objects.filter(
+            holat=ArizaMakler.Holat.BOGLANDI
+        ).count()
+
+        # Tasdiqlangan (bloklangmagan) rieltorlar soni
+        rieltor_soni = MaklerProfil.objects.filter(
+            verify_holat=MaklerProfil.VerifyHolat.VERIFIED
+        ).count()
+
+        # Javob vaqti admin nazoratida — singleton modeldan
         stat = UserStatistika.get()
-        serializer = UserStatistikaSerializer(stat)
+
+        serializer = UserStatistikaSerializer({
+            'bitimlar': bitimlar,
+            'rieltor_soni': rieltor_soni,
+            'javob_vaqti': stat.javob_vaqti,
+        })
         return Response(serializer.data)
 
 
 class UserStatistikaAdminView(APIView):
-    """Admin — user statistikasini tahrirlash"""
+    """Admin — javob_vaqti ni tahrirlash"""
     permission_classes = [IsAdminUser]
 
     @extend_schema(
-        summary="[Admin] User statistikasini ko'rish",
+        summary="[Admin] Javob vaqtini ko'rish",
         responses={200: UserStatistikaAdminSerializer},
         tags=["Admin – Settings"],
     )
@@ -199,7 +223,7 @@ class UserStatistikaAdminView(APIView):
         return Response(UserStatistikaAdminSerializer(stat).data)
 
     @extend_schema(
-        summary="[Admin] User statistikasini tahrirlash",
+        summary="[Admin] Javob vaqtini tahrirlash",
         request=UserStatistikaAdminSerializer,
         responses={200: UserStatistikaAdminSerializer},
         tags=["Admin – Settings"],
@@ -213,7 +237,7 @@ class UserStatistikaAdminView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @extend_schema(
-        summary="[Admin] User statistikasini to'liq yangilash",
+        summary="[Admin] Javob vaqtini to'liq yangilash",
         request=UserStatistikaAdminSerializer,
         responses={200: UserStatistikaAdminSerializer},
         tags=["Admin – Settings"],
@@ -252,19 +276,24 @@ class RieltorStatistikaView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Ushbu rieltorga tegishli barcha ariza-rieltor yozuvlari
-        qs = ArizaMakler.objects.filter(rieltor=rieltor)
-        jami = qs.count()
+        from django.db.models import Count, Q
 
-        # Faol = yangi yoki ko'rildi (yopilmagan)
-        faol = qs.filter(holat__in=[
-            ArizaMakler.Holat.YANGI,
-            ArizaMakler.Holat.KORILDI,
-            ArizaMakler.Holat.BOGLANDI,
-        ]).count()
+        # 3 ta COUNT o'rniga bitta aggregate so'rovi — bazaga 1 ta query
+        agg = ArizaMakler.objects.filter(rieltor=rieltor).aggregate(
+            jami=Count('id'),
+            faol=Count('id', filter=Q(holat__in=[
+                ArizaMakler.Holat.YANGI,
+                ArizaMakler.Holat.KORILDI,
+                ArizaMakler.Holat.BOGLANDI,
+            ])),
+            yopilgan=Count('id', filter=Q(holat=ArizaMakler.Holat.YOPILDI)),
+        )
+
+        jami = agg['jami']
+        faol = agg['faol']
+        yopilgan = agg['yopilgan']
 
         # Konversiya = yopilgan / jami × 100
-        yopilgan = qs.filter(holat=ArizaMakler.Holat.YOPILDI).count()
         konversiya = round((yopilgan / jami * 100), 1) if jami > 0 else 0.0
 
         data = {

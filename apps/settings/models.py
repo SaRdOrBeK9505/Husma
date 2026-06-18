@@ -238,21 +238,17 @@ class KontaktMalumot(models.Model):
 
 class UserStatistika(models.Model):
     """
-    Singleton model — User paneli uchun statik statistika.
-    Admin paneldan o'zgartiriladi.
+    Singleton model — User paneli uchun admin tomonidan boshqariladigan sozlamalar.
+
+    ESLATMA: bitimlar va rieltor_soni ENDI bu modelda saqlanmaydi —
+    ular /api/statistika/ endpoint'idan DB'dan real-time hisoblanadi
+    (ArizaMakler.holat='boglandi' va MaklerProfil.verify_holat='verified').
+    Bu modelda faqat hisoblash qiyin bo'lgan javob_vaqti qoldirildi.
     """
-    bitimlar = models.PositiveIntegerField(
-        default=500,
-        help_text="Masalan: 500 → frontendda '500+' ko'rinadi"
-    )
-    rieltor_soni = models.PositiveIntegerField(
-        default=50,
-        help_text="Masalan: 50 → frontendda '50+' ko'rinadi"
-    )
     javob_vaqti = models.CharField(
         max_length=10,
         default="2s",
-        help_text="Javob vaqti (2s, 5min, ...)"
+        help_text="O'rtacha javob vaqti (2s, 5min, ...) — admin paneldan kiritiladi"
     )
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -269,5 +265,6 @@ class UserStatistika(models.Model):
 
     @classmethod
     def get(cls):
+        """Har doim bitta statistika obyektini qaytaradi"""
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj

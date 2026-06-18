@@ -39,18 +39,22 @@ class QadamSerializer(serializers.Serializer):
 
 # ===== USER STATISTIKA =====
 
-class UserStatistikaSerializer(serializers.ModelSerializer):
-    """User paneli uchun — statik statistika"""
-    class Meta:
-        model = UserStatistika
-        fields = ['bitimlar', 'rieltor_soni', 'javob_vaqti']
+class UserStatistikaSerializer(serializers.Serializer):
+    """
+    User paneli uchun — dinamik statistika.
+    bitimlar va rieltor_soni DB'dan real hisoblanadi.
+    javob_vaqti esa admin nazoratida (UserStatistika modelidan).
+    """
+    bitimlar    = serializers.IntegerField(help_text="Yopilgan bitimlar soni (DB'dan hisob)")
+    rieltor_soni = serializers.IntegerField(help_text="Faol (verified) rieltorlar soni (DB'dan hisob)")
+    javob_vaqti = serializers.CharField(help_text="O'rtacha javob vaqti (admin tomonidan kiritilgan)")
 
 
 class UserStatistikaAdminSerializer(serializers.ModelSerializer):
-    """Admin uchun — tahrirlash"""
+    """Admin uchun — faqat javob_vaqti ni tahrirlash"""
     class Meta:
         model = UserStatistika
-        fields = ['bitimlar', 'rieltor_soni', 'javob_vaqti', 'updated_at']
+        fields = ['javob_vaqti', 'updated_at']
         read_only_fields = ['updated_at']
 
 

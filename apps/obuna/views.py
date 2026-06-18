@@ -70,8 +70,22 @@ class MeningObunamView(APIView):
     )
     def get(self, request):
         rieltor = request.user.rieltor_profil
-        joriy = rieltor.obunalar.faol().order_by('-tugash_vaqti').first()
-        tarix = rieltor.obunalar.all().select_related('tarif').prefetch_related('tolovlar')
+
+        # Ikki marta so'rov o'rniga bir marta barcha obunalarni yuklaymiz,
+        # keyin Python da faolini topamiz (DB ga qo'shimcha so'rov ketmaydi).
+        tarix = list(
+            rieltor.obunalar.all()
+            .select_related('tarif')
+            .prefetch_related('tolovlar')
+        )
+        from django.utils import timezone as tz
+        joriy = next(
+            (
+                o for o in tarix
+                if o.holat == 'faol' and o.tugash_vaqti and tz.now() < o.tugash_vaqti
+            ),
+            None
+        )
 
         return Response({
             "faol": rieltor.faol,

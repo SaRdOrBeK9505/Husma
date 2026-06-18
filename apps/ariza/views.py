@@ -70,7 +70,7 @@ class UserArizalarView(ListAPIView):
 
         qs = Ariza.objects.filter(
             user=self.request.user
-        ).select_related('hudud')
+        ).select_related('hudud', 'viloyat', 'mulk_turi')
 
         holat = self.request.query_params.get('holat')
         if holat in ['yangi', 'korilmoqda', 'yopilgan']:
@@ -95,7 +95,7 @@ class UserArizaDetailView(RetrieveUpdateDestroyAPIView):
         # Faqat o'zining arizalarini
         return Ariza.objects.filter(
             user=self.request.user
-        ).select_related('hudud')
+        ).select_related('hudud', 'viloyat', 'mulk_turi')
 
     @extend_schema(
         summary="Arizani ko'rish",
@@ -183,13 +183,13 @@ class RieltorArizalarView(ListAPIView):
         if getattr(self, 'swagger_fake_view', False):
             return Ariza.objects.none()
         rieltor = self.request.user.rieltor_profil
-        ariza_ids = ArizaMakler.objects.filter(
-            rieltor=rieltor
-        ).values_list('ariza_id', flat=True)
 
+        # MUHIM: ariza_ids + id__in o'rniga to'g'ridan JOIN ishlatiladi.
+        # Avvalgi yondashuv: 2 ta alohida so'rov (ArizaMakler query + IN(...)).
+        # Hozirgi: bitta JOIN — katta user bazasida sezilarli tez.
         qs = Ariza.objects.filter(
-            id__in=ariza_ids,
-        ).select_related('hudud', 'user')
+            ariza_rieltorlar__rieltor=rieltor,
+        ).select_related('hudud', 'viloyat', 'mulk_turi', 'user')
 
         holat = self.request.query_params.get('holat')
         if holat in ['yangi', 'korilmoqda', 'yopilgan']:
@@ -219,10 +219,10 @@ class RieltorArizaDetailView(RetrieveAPIView):
         if getattr(self, 'swagger_fake_view', False):
             return Ariza.objects.none()
         rieltor = self.request.user.rieltor_profil
-        ariza_ids = ArizaMakler.objects.filter(
-            rieltor=rieltor
-        ).values_list('ariza_id', flat=True)
-        return Ariza.objects.filter(id__in=ariza_ids)
+        # To'g'ridan JOIN — ariza_ids IN(...) o'rniga
+        return Ariza.objects.filter(
+            ariza_rieltorlar__rieltor=rieltor,
+        ).select_related('hudud', 'viloyat', 'mulk_turi', 'user')
 
 
 # Backward compatibility

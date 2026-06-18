@@ -49,18 +49,57 @@ def arizani_rieltorlarga_yuborish(ariza: Ariza) -> int:
 arizani_maklerlarga_yuborish = arizani_rieltorlarga_yuborish
 
 
-def yangi_rieltorga_eski_arizalarni_biriktir(rieltor, kun_chegarasi=30) -> int:
+def _xabar_navbatiga_qosh(rieltor, ariza) -> None:
     """
-    Yangi ro'yxatdan o'tgan rieltor uchun uning hudud va mulk_turlari bo'yicha
-    oxirgi `kun_chegarasi` kun ichida yaratilgan ochiq arizalarni avtomatik biriktiradi.
+    [KELAJAK EXTENSION POINT — hozir bo'sh]
 
-    BU FUNKSIYANI registratsiya view'ida, rieltor.hududlar.set(...) va
-    rieltor.mulk_turlari.set(...) chaqirilgandan KEYIN ishlatish kerak.
-    post_save signal'ga ulash XATO — ManyToMany maydonlar signal paytida
-    hali bo'sh bo'ladi.
+    Bu funksiya kelajakda Telegram xabarini to'g'ridan-to'g'ri YUBORMASDAN,
+    alohida navbat jadvaliga (`TelegramXabarNavbati` kabi) yozuv qo'shishi kerak.
+    Haqiqiy yuborish PythonAnywhere Scheduled Task orqali ishlaydigan alohida
+    management command'da (`python manage.py telegram_xabar_yuboruvchi`) amalga
+    oshirilishi kerak.
 
-    ignore_conflicts=True: ArizaMaklerda unique_together=['ariza','rieltor'] bor,
-    shuning uchun funksiya ikki marta chaqirilsa ham dublikat yaratilmaydi.
+    MUHIM: Bu funksiya HECH QACHON HTTP request ichida sinxron Telegram API
+    chaqirig'i qilmasligi kerak — PythonAnywhere'da bu so'rovni "osilib qolish"
+    holatiga olib kelishi mumkin.
+
+    Parametrlar:
+        rieltor: MaklerProfil — xabar yuborish kerak bo'lgan rieltor
+        ariza:   Ariza        — yangi biriktirilgan ariza
+    """
+    # TODO: bu yerda TelegramXabarNavbati.objects.create(rieltor=rieltor, ariza=ariza)
+    #       yoziladi, real model/jadval tayyor bo'lgach.
+    pass
+
+
+def yangi_rieltorga_eski_arizalarni_biriktir(
+    rieltor,
+    kun_chegarasi: int = 30,
+    xabar_yubor: bool = False,
+) -> int:
+    """
+    Berilgan rieltorning hududlar/mulk_turlari'iga mos keluvchi,
+    hali yopilmagan (holat != yopilgan) va belgilangan vaqt oralig'idagi
+    arizalarni topib, ArizaMakler orqali rieltorga biriktiradi.
+    Allaqachon biriktirilganlarni qayta qo'shmaydi (idempotent).
+
+    Parametrlar:
+        rieltor        : MaklerProfil — kimga biriktirish kerak
+        kun_chegarasi  : int  — necha kun oldingi arizalargacha (standart: 30)
+        xabar_yubor    : bool — True bo'lsa har bir yangi biriktirilgan ariza
+                                uchun _xabar_navbatiga_qosh() chaqiriladi.
+                                Eski arizalar uchun (backfill) DOIM False qoldirilsin —
+                                eski arizalarga "yangi ariza keldi" signali yuborish noto'g'ri.
+
+    MUHIM — ManyToMany vaqt tartibi:
+        Bu funksiyani rieltor.hududlar.set(...) va rieltor.mulk_turlari.set(...)
+        chaqirilgandan KEYIN ishlatish kerak. post_save signal'ga ulash XATO —
+        ManyToMany maydonlar signal paytida hali bo'sh bo'ladi (loyihada ilgari
+        shunga o'xshash token tartibi xatosi yuz bergan edi).
+
+    Idempotentlik:
+        ignore_conflicts=True ishlatilgan: ArizaMaklerda unique_together=['ariza','rieltor']
+        bor, shuning uchun funksiya ikki marta chaqirilsa ham dublikat yaratilmaydi.
 
     Qaytaradi: yangi yaratilgan ArizaMakler yozuvlari soni.
     """
@@ -69,13 +108,15 @@ def yangi_rieltorga_eski_arizalarni_biriktir(rieltor, kun_chegarasi=30) -> int:
 
     chegara_vaqt = timezone.now() - timedelta(days=kun_chegarasi)
 
-    mos_arizalar = Ariza.objects.filter(
-        holat__in=[Ariza.Holat.YANGI, Ariza.Holat.KORILMOQDA],
-        created_at__gte=chegara_vaqt,
-        mulk_turi__in=rieltor.mulk_turlari.all(),
-        hudud__in=rieltor.hududlar.all(),
-    ).exclude(
-        ariza_rieltorlar__rieltor=rieltor,
+    mos_arizalar = list(
+        Ariza.objects.filter(
+            holat__in=[Ariza.Holat.YANGI, Ariza.Holat.KORILMOQDA],
+            created_at__gte=chegara_vaqt,
+            mulk_turi__in=rieltor.mulk_turlari.all(),
+            hudud__in=rieltor.hududlar.all(),
+        ).exclude(
+            ariza_rieltorlar__rieltor=rieltor,
+        )
     )
 
     yangi_yozuvlar = [
@@ -84,4 +125,12 @@ def yangi_rieltorga_eski_arizalarni_biriktir(rieltor, kun_chegarasi=30) -> int:
     ]
 
     ArizaMakler.objects.bulk_create(yangi_yozuvlar, ignore_conflicts=True)
+
+    # Agar xabar_yubor=True bo'lsa (masalan, yangi registratsiyada),
+    # har bir yangi biriktirilgan ariza uchun xabar navbatiga qo'shamiz.
+    # Eski arizalar (backfill/update) uchun xabar_yubor=False qoldirilsin.
+    if xabar_yubor:
+        for ariza in mos_arizalar:
+            _xabar_navbatiga_qosh(rieltor, ariza)
+
     return len(yangi_yozuvlar)
