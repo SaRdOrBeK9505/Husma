@@ -26,6 +26,10 @@ from .serializers import (
     TolovAdminSerializer,
 )
 from .payme.checkout import payme_checkout_url
+from .multicard.client import MulticardClient, MulticardError
+
+import logging
+_log = logging.getLogger('multicard')
 
 
 # ============================================================
@@ -150,9 +154,9 @@ class ObunaSotibOlishView(APIView):
         serializer = ObunaYaratishSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        tarif = serializer.context['tarif']
+        tarif    = serializer.context['tarif']
         provayder = serializer.validated_data['provayder']
-        rieltor = request.user.rieltor_profil
+        rieltor  = request.user.rieltor_profil
 
         with transaction.atomic():
             obuna = Obuna.objects.create(
@@ -176,11 +180,46 @@ class ObunaSotibOlishView(APIView):
             "provayder": provayder,
         }
 
+        # ----- PAYME -----
         if provayder == Tolov.Provayder.PAYME:
             javob["tolov_url"] = payme_checkout_url(
                 obuna_id=obuna.id,
                 amount_som=tarif.narx,
             )
+
+        # ----- MULTICARD -----
+        elif provayder == Tolov.Provayder.MULTICARD:
+            try:
+                from .multicard.client import MulticardClient, MulticardError
+                client = MulticardClient()
+                result = client.create_invoice(
+                    obuna_id=obuna.id,
+                    amount_som=tarif.narx,
+                    description=f"Husma — {tarif.nomi}",
+                )
+                # Invoice ID ni Tolov ga saqlaymiz (webhook da qidiramiz)
+                tolov.tashqi_id = result["invoice_id"]
+                tolov.metadata  = result
+                tolov.save(update_fields=["tashqi_id", "metadata", "updated_at"])
+                javob["tolov_url"] = result["invoice_url"]
+
+            except MulticardError as exc:
+                _log.error(
+                    "[Multicard] Invoice yaratishda xato: obuna_id=%s err=%s",
+                    obuna.id, exc,
+                )
+                # Yaratilgan Obuna va Tolov ni tozalaymiz
+                with transaction.atomic():
+                    tolov.delete()
+                    obuna.delete()
+                return Response(
+                    {
+                        "error": "Multicard bilan bog'lanishda xato. "
+                                 "Keyinroq qayta urinib ko'ring.",
+                        "detail": str(exc),
+                    },
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
 
         return Response(javob, status=status.HTTP_201_CREATED)
 

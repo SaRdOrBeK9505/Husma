@@ -186,6 +186,47 @@ CLICK_SERVICE_ID = os.getenv('CLICK_SERVICE_ID', '')
 CLICK_MERCHANT_ID = os.getenv('CLICK_MERCHANT_ID', '')
 CLICK_SECRET_KEY = os.getenv('CLICK_SECRET_KEY', '')
 CLICK_MERCHANT_USER_ID = os.getenv('CLICK_MERCHANT_USER_ID', '')
+# ===== MULTICARD PAYMENT GATEWAY =====
+# Multicard kabinetdan olinadi: https://cabinet.multicard.uz
+# DIQQAT: bular login/parol EMAS — application_id + secret juftligi (token olish uchun)
+MULTICARD_APPLICATION_ID = os.getenv('MULTICARD_APPLICATION_ID', '')
+MULTICARD_SECRET = os.getenv('MULTICARD_SECRET', '')
+
+# Multicard kabinetda loyihangizga biriktirilgan do'kon identifikatori.
+# Invoice yaratishda MAJBURIY maydon (avvalgi versiyada umuman yuborilmagan edi).
+MULTICARD_STORE_ID = os.getenv('MULTICARD_STORE_ID', '')
+
+# API bazaviy URL (sandbox yoki prod)
+MULTICARD_TEST_MODE = os.getenv('MULTICARD_TEST_MODE', 'True') == 'True'
+MULTICARD_BASE_URL = os.getenv(
+    'MULTICARD_BASE_URL',
+    'https://dev-mesh.multicard.uz' if MULTICARD_TEST_MODE else 'https://mesh.multicard.uz',
+)
+
+# Multicard to'lov natijasini shu URL ga server-to-server POST qiladi
+# (invoice yaratishda "callback_url" sifatida yuboriladi).
+# Masalan: https://api.yourdomain.uz/api/obuna/multicard/callback/
+# Xavfsizlik bu yerda alohida "webhook secret" bilan EMAS, balki har bir
+# so'rovdagi MD5 "sign" maydoni (yuqoridagi MULTICARD_SECRET asosida) bilan tekshiriladi.
+MULTICARD_CALLBACK_URL = os.getenv(
+    'MULTICARD_CALLBACK_URL',
+    ''  # .env da to'ldiring
+)
+
+# To'lovdan keyin foydalanuvchi brauzerda qaytadigan URL (invoice'da "return_url").
+# Multicard'da alohida success/fail URL emas — bitta return_url bor;
+# natija query parametrlari orqali emas, callback orqali allaqachon DB'da bo'ladi.
+# Masalan: https://api.yourdomain.uz/api/obuna/multicard/return/
+MULTICARD_RETURN_URL = os.getenv(
+    'MULTICARD_RETURN_URL',
+    ''  # .env da to'ldiring
+)
+
+# Frontend bazaviy URL — return view dan redirect uchun
+FRONTEND_URL = os.getenv('FRONTEND_URL', '')
+
+# HTTP so'rov timeout (sekund)
+MULTICARD_TIMEOUT = int(os.getenv('MULTICARD_TIMEOUT', '15'))
 
 LANGUAGE_CODE = 'uz'
 TIME_ZONE = 'Asia/Tashkent'

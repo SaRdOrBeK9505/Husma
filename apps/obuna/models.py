@@ -132,9 +132,10 @@ class Tolov(models.Model):
     """
 
     class Provayder(models.TextChoices):
-        PAYME = 'payme', 'Payme'
-        CLICK = 'click', 'Click'
-        MANUAL = 'manual', 'Qo\'lda (admin)'
+        PAYME     = 'payme',     'Payme'
+        CLICK     = 'click',     'Click'
+        MANUAL    = 'manual',    'Qo\'lda (admin)'
+        MULTICARD = 'multicard', 'Multicard'
 
     class Holat(models.TextChoices):
         KUTILMOQDA = 'kutilmoqda', 'Kutilmoqda'
