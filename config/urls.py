@@ -15,7 +15,7 @@ urlpatterns = [
     path('api/', include('apps.makler.urls')),
     path('api/', include('apps.ariza.urls')),
     path('api/', include('apps.review.urls')),
-    # path('api/', include('apps.kvartira.urls')),
+    # path('api/', include('apps.kvartira.urls')),  # Hozircha ishlatilmaydi
     path('api/', include('apps.settings.urls')),
     path('api/', include('apps.obuna.urls')),
 

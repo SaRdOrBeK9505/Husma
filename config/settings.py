@@ -32,6 +32,7 @@ if not DEBUG:
     X_FRAME_OPTIONS = 'DENY'
     SECURE_HSTS_SECONDS = 31536000  # 1 yil
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_SSL_REDIRECT = True  # HTTP -> HTTPS redirect
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
@@ -112,7 +113,6 @@ else:
             'PASSWORD': os.getenv('DATABASE_PASSWORD'),
             'HOST': os.getenv('DATABASE_HOST', 'localhost'),
             'PORT': os.getenv('DATABASE_PORT', '5432'),
-            'CONN_MAX_AGE': 60,  # Connection pooling — har 60 sekundda yangilaydi
         }
     }
 
@@ -197,6 +197,17 @@ PAYME_MERCHANT_ID = os.getenv('PAYME_MERCHANT_ID', '')
 PAYME_KEY = os.getenv('PAYME_KEY', '')
 # Test rejimi: True bo'lsa test.paycom.uz, False bo'lsa checkout.paycom.uz
 PAYME_TEST_MODE = os.getenv('PAYME_TEST_MODE', 'True') == 'True'
+
+# OGOHLANTIRISH: Production da PAYME_TEST_MODE=False qiling!
+if not DEBUG and PAYME_TEST_MODE:
+    import warnings
+    warnings.warn(
+        "⚠️ Production muhitda PAYME_TEST_MODE=True! "
+        ".env da PAYME_TEST_MODE=False qiling.",
+        RuntimeWarning,
+        stacklevel=2
+    )
+
 PAYME_CHECKOUT_URL = (
     'https://test.paycom.uz' if PAYME_TEST_MODE else 'https://checkout.paycom.uz'
 )
@@ -218,6 +229,17 @@ MULTICARD_STORE_ID = os.getenv('MULTICARD_STORE_ID', '')
 
 # API bazaviy URL (sandbox yoki prod)
 MULTICARD_TEST_MODE = os.getenv('MULTICARD_TEST_MODE', 'True') == 'True'
+
+# OGOHLANTIRISH: Production da MULTICARD_TEST_MODE=False qiling!
+if not DEBUG and MULTICARD_TEST_MODE:
+    import warnings
+    warnings.warn(
+        "⚠️ Production muhitda MULTICARD_TEST_MODE=True! "
+        ".env da MULTICARD_TEST_MODE=False qiling.",
+        RuntimeWarning,
+        stacklevel=2
+    )
+
 MULTICARD_BASE_URL = os.getenv(
     'MULTICARD_BASE_URL',
     'https://dev-mesh.multicard.uz' if MULTICARD_TEST_MODE else 'https://mesh.multicard.uz',

@@ -518,6 +518,28 @@ class RieltorOTPVerifyView(RequestLogMixin, APIView):
         try:
             otp = OTPKode.objects.get(telegram_id=telegram_id, kode=kode)
         except OTPKode.DoesNotExist:
+            # XAVFSIZLIK: Noto'g'ri kod kiritilganda barcha OTP'larni tekshirib
+            # urinishlar sonini nazorat qilamiz (brute-force himoyasi)
+            otp_lar = OTPKode.objects.filter(telegram_id=telegram_id)
+            if otp_lar.exists():
+                # Register datada urinishlar sonini saqlaymiz
+                birinchi_otp = otp_lar.first()
+                reg_data = birinchi_otp.register_data
+                urinishlar = reg_data.get('_otp_attempts', 0) + 1
+                
+                if urinishlar >= 5:
+                    # 5 ta noto'g'ri urinish - barcha OTP'larni o'chiramiz
+                    otp_lar.delete()
+                    return Response(
+                        {'error': "Juda ko'p noto'g'ri urinish. Registratsiyani qaytadan boshlang."},
+                        status=status.HTTP_429_TOO_MANY_REQUESTS
+                    )
+                
+                # Urinishlar sonini yangilaymiz
+                for otp_obj in otp_lar:
+                    otp_obj.register_data['_otp_attempts'] = urinishlar
+                    otp_obj.save(update_fields=['register_data'])
+            
             return Response(
                 {'error': "Kod noto'g'ri yoki topilmadi"},
                 status=status.HTTP_400_BAD_REQUEST
