@@ -9,22 +9,31 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY environment variable is not set. Iltimos .env faylini tekshiring.")
+
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
-# if DEBUG:
-#     CORS_ALLOW_ALL_ORIGINS = True
-# else:
-#     CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', '').split(',')
-#
-# # Security — production da
-# if not DEBUG:
-#     SECURE_BROWSER_XSS_FILTER = True
-#     SECURE_CONTENT_TYPE_NOSNIFF = True
-#     X_FRAME_OPTIONS = 'DENY'
-#     SECURE_HSTS_SECONDS = 3600
-#     SESSION_COOKIE_SECURE = True
-#     CSRF_COOKIE_SECURE = True
+# CORS sozlamalari
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOWED_ORIGINS = [
+        origin.strip()
+        for origin in os.getenv('CORS_ALLOWED_ORIGINS', '').split(',')
+        if origin.strip()
+    ]
+
+# Security headers — production da majburiy
+if not DEBUG:
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
+    SECURE_HSTS_SECONDS = 31536000  # 1 yil
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 INSTALLED_APPS = [
     'jazzmin',
@@ -103,6 +112,7 @@ else:
             'PASSWORD': os.getenv('DATABASE_PASSWORD'),
             'HOST': os.getenv('DATABASE_HOST', 'localhost'),
             'PORT': os.getenv('DATABASE_PORT', '5432'),
+            'CONN_MAX_AGE': 60,  # Connection pooling — har 60 sekundda yangilaydi
         }
     }
 
@@ -122,6 +132,16 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardPagination',
     'PAGE_SIZE': 20,
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '60/minute',
+        'user': '300/minute',
+        'auth': '10/minute',   # Auth endpointlari uchun qattiqroq limit
+        'otp': '5/minute',     # OTP so'rov uchun
+    },
 }
 
 SPECTACULAR_SETTINGS = {
@@ -161,12 +181,12 @@ AUTHENTICATION_BACKENDS = [
 # JWT
 from datetime import timedelta
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),   # 7 kun emas, 60 daqiqa
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
 }
 
-# CORS — Telegram Mini App uchun
-CORS_ALLOW_ALL_ORIGINS = True  # Productda o'zgartirish kerak
+# CORS — faqat DEBUG=True da hamma origindan, production da .env dan o'qiladi
+# (yuqorida if/else bilan sozlangan)
 
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 

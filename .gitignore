@@ -13,8 +13,10 @@ ENV/
 
 # Django
 *.log
+logs/
 local_settings.py
 db.sqlite3
+db.sqlite3-journal
 media/
 staticfiles/
 
@@ -32,6 +34,15 @@ staticfiles/
 # OS
 .DS_Store
 Thumbs.db
+
+# Dev test scripts — production ga kirmasligi kerak
+backend_test.py
+bot_tekshir.py
+frontend_initdata_tekshir.py
+initdata_yasash.py
+tekshir_live.py
+tekshir_real.py
+initdata.txt
 
 # Migrations (optional — bu loyihada saqlab qolish mumkin)
 # apps/*/migrations/0*.py

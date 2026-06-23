@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
 from datetime import timedelta
@@ -25,6 +26,16 @@ import logging as _logging
 import json as _json
 
 _auth_log = _logging.getLogger("telegram_auth")
+
+
+class AuthRateThrottle(AnonRateThrottle):
+    """Auth endpointlari uchun qattiqroq rate limit."""
+    scope = 'auth'
+
+
+class OtpRateThrottle(UserRateThrottle):
+    """OTP so'rov uchun rate limit (faqat autentifikatsiyadan o'tgan user)."""
+    scope = 'otp'
 
 
 class RequestLogMixin:
@@ -99,6 +110,7 @@ def _log_request(request, endpoint_nomi: str):
 
 class TelegramAuthView(RequestLogMixin, APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
     log_nomi = "TELEGRAM AUTH"
 
     @extend_schema(
@@ -225,39 +237,11 @@ class MeView(APIView):
         return Response(serializer.data)
 
 
-class StatistikaView(APIView):
-    permission_classes = [AllowAny]
-
-    @extend_schema(
-        summary="Umumiy statistika",
-        description="Bosh sahifadagi statistika ma'lumotlari",
-        responses={
-            200: OpenApiResponse(
-                description="Statistika",
-                examples=[OpenApiExample(
-                    name="Success",
-                    value={
-                        "jami_bitimlar": 500,
-                        "jami_rieltorlar": 50,
-                        "javob_vaqti": "2s",
-                    }
-                )]
-            )
-        },
-        tags=["Statistika"],
-    )
-    def get(self, request):
-        return Response({
-            "jami_bitimlar": Ariza.objects.filter(holat='yopilgan').count(),
-            "jami_rieltorlar": MaklerProfil.objects.filter(verify_holat='verified').count(),
-            "javob_vaqti": "2s",
-        })
-
-
 # ===== RIELTOR AUTH =====
 
 class RieltorLoginView(RequestLogMixin, APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
     log_nomi = "RIELTOR LOGIN"
 
     @extend_schema(
@@ -405,6 +389,7 @@ class RieltorOTPSorovView(RequestLogMixin, APIView):
     Telegramga 6 xonali OTP kodi yuboriladi.
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [OtpRateThrottle]
     log_nomi = "RIELTOR OTP SO'ROV"
 
     @extend_schema(
@@ -485,6 +470,7 @@ class RieltorOTPVerifyView(RequestLogMixin, APIView):
     To'g'ri bo'lsa user makler roliga o'tadi, MaklerProfil yaratiladi.
     """
     permission_classes = [IsAuthenticated]
+    throttle_classes = [OtpRateThrottle]
     log_nomi = "RIELTOR OTP VERIFY"
 
     @extend_schema(

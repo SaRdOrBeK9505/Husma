@@ -3,7 +3,6 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     TelegramAuthView,
     MeView,
-    StatistikaView,
     RieltorLoginView,
     RieltorFaollikView,
     RieltorOTPSorovView,
@@ -25,5 +24,5 @@ urlpatterns = [
     # ===== UMUMIY =====
     path('auth/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('users/me/', MeView.as_view(), name='me'),
-    path('statistika/', StatistikaView.as_view(), name='statistika'),
+    # statistika/ endpoint settings.urls ga ko'chirildi (UserStatistikaView)
 ]

@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
+from django.db import transaction
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, inline_serializer
 from drf_spectacular.types import OpenApiTypes
 from rest_framework import serializers as drf_serializers
@@ -143,9 +144,9 @@ class UserArizaDetailView(RetrieveUpdateDestroyAPIView):
     )
     def delete(self, request, *args, **kwargs):
         ariza = self.get_object()
-        if ariza.holat == 'korilmoqda':
+        if ariza.holat in (Ariza.Holat.KORILMOQDA, Ariza.Holat.YOPILGAN):
             return Response(
-                {'error': 'Ko\'rilmoqda holatdagi arizani o\'chirib bo\'lmaydi'},
+                {'error': f"'{ariza.get_holat_display()}' holatidagi arizani o'chirib bo'lmaydi"},
                 status=status.HTTP_400_BAD_REQUEST
             )
         return super().destroy(request, *args, **kwargs)
@@ -281,30 +282,32 @@ class RieltorArizaQabulView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        ariza = ariza_makler.ariza
-
-        if ariza.holat != Ariza.Holat.YANGI:
-            return Response(
-                {'error': f"Ariza '{ariza.get_holat_display()}' holatida, qabul qilib bo'lmaydi"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         if ariza_makler.holat == ArizaMakler.Holat.BOGLANDI:
             return Response(
                 {'error': 'Siz bu arizani allaqachon qabul qilgansiz'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        ariza_makler.holat = ArizaMakler.Holat.BOGLANDI
-        ariza_makler.korilgan_vaqt = timezone.now()
-        ariza_makler.save(update_fields=['holat', 'korilgan_vaqt'])
+        # Race condition oldini olish: select_for_update + atomic
+        with transaction.atomic():
+            ariza = Ariza.objects.select_for_update().get(pk=pk)
 
-        ariza.holat = Ariza.Holat.KORILMOQDA
-        ariza.save(update_fields=['holat'])
+            if ariza.holat != Ariza.Holat.YANGI:
+                return Response(
+                    {'error': f"Ariza '{ariza.get_holat_display()}' holatida, qabul qilib bo'lmaydi"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            ariza_makler.holat = ArizaMakler.Holat.BOGLANDI
+            ariza_makler.korilgan_vaqt = timezone.now()
+            ariza_makler.save(update_fields=['holat', 'korilgan_vaqt'])
+
+            ariza.holat = Ariza.Holat.KORILMOQDA
+            ariza.save(update_fields=['holat'])
 
         return Response(
             {
-                'message': 'Ariza qabul qilindi. Mijoz bilan bog\'laning.',
+                'message': "Ariza qabul qilindi. Mijoz bilan bog'laning.",
                 'ariza': MaklerArizaSerializer(ariza).data,
             },
             status=status.HTTP_200_OK,
@@ -381,6 +384,13 @@ class RieltorArizaYopishView(APIView):
 
         ariza.holat = Ariza.Holat.YOPILGAN
         ariza.save(update_fields=['holat'])
+
+        # Rieltor statistikasini yangilash
+        from apps.makler.models import MaklerProfil
+        from django.db.models import F
+        MaklerProfil.objects.filter(pk=rieltor.pk).update(
+            jami_bitimlar=F('jami_bitimlar') + 1
+        )
 
         return Response(
             {

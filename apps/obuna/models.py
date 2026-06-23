@@ -37,7 +37,10 @@ class Tarif(models.Model):
 
 class ObunaQuerySet(models.QuerySet):
     def faol(self):
-        """Hozir amal qilayotgan obunalar: holat=faol VA tugash vaqti o'tmagan."""
+        """
+        Hozir amal qilayotgan obunalar: holat=faol VA tugash vaqti o'tmagan.
+        tugash_vaqti__gt=now → now < tugash_vaqti (muddati tugagan obuna chiqarib tashlanadi).
+        """
         now = timezone.now()
         return self.filter(holat=Obuna.Holat.FAOL, tugash_vaqti__gt=now)
 
@@ -92,10 +95,11 @@ class Obuna(models.Model):
 
     @property
     def faolmi(self) -> bool:
+        """Hozir amal qilayotganmi — QuerySet.faol() bilan bir xil mantiq."""
         return (
             self.holat == self.Holat.FAOL
             and self.tugash_vaqti is not None
-            and timezone.now() <= self.tugash_vaqti
+            and timezone.now() < self.tugash_vaqti  # strictly less than (QuerySet bilan bir xil)
         )
 
     def faollashtirish(self):

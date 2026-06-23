@@ -27,7 +27,7 @@ urlpatterns = [
     path('obuna/<int:pk>/bekor/', ObunaBekorView.as_view(), name='obuna-bekor'),
 
     # ===== PAYME WEBHOOK =====
-    # path('obuna/payme/webhook/', PaymeWebhookView.as_view(), name='payme-webhook'),
+    path('obuna/payme/webhook/', PaymeWebhookView.as_view(), name='payme-webhook'),
 
     # ===== MULTICARD =====
     # Frontend "To'lash" tugmasi bosilganda chaqiriladi — checkout_url qaytaradi

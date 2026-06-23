@@ -1,3 +1,0 @@
-{"init_data": "user=%7B%22id%22%3A123456789%2C%22first_name%22%3A%22Ali%22%2C%22last_name%22%3A%22Valiyev%22%2C%22username%22%3A%22ali_uz%22%2C%22language_code%22%3A%22uz%22%7D&auth_date=1781464902&query_id=AATEST123&hash=251d438c18e3ef53f0b1f1dbc05e058db36c15ccbb0ef545405efc7110738035"}
-
-manage.py shell -c "from apps.users.models import CustomUser; u=CustomUser.objects.filter(telegram_id=1234567891).first(); u.set_password('admin12345'); u.is_staff=True; u.is_superuser=True; u.save(); print('Parol yangilandi. Login (telegram_id):', u.telegram_id, '| Parol: admin12345')"

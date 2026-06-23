@@ -169,14 +169,23 @@ class MulticardCreateInvoiceView(APIView):
             )
 
         # --- Egalik tekshiruvi: faqat o'z obunasi uchun to'lov yaratsin ---
-        if hasattr(obuna, "foydalanuvchi") and obuna.foydalanuvchi_id != request.user.id:
-            logger.warning(
-                "[Multicard] Foydalanuvchi %s o'ziga tegishli bo'lmagan obuna_id=%s uchun to'lov yaratmoqchi",
-                request.user.id, obuna_id,
-            )
+        # Obuna rieltor uchun yaratiladi (foydalanuvchi maydoni yo'q)
+        try:
+            if obuna.rieltor.user_id != request.user.id:
+                logger.warning(
+                    "[Multicard] Foydalanuvchi %s o'ziga tegishli bo'lmagan obuna_id=%s uchun to'lov yaratmoqchi",
+                    request.user.id, obuna_id,
+                )
+                return Response(
+                    {"error": "Bu obuna sizga tegishli emas"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        except AttributeError:
+            # rieltor yoki rieltor.user mavjud emas — obuna buzilgan
+            logger.error("[Multicard] Obuna %s da rieltor mavjud emas", obuna_id)
             return Response(
-                {"error": "Bu obuna sizga tegishli emas"},
-                status=status.HTTP_403_FORBIDDEN,
+                {"error": "Obuna ma'lumotlari noto'g'ri"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # --- Allaqachon faol/kutilayotgan to'lov bormi ---

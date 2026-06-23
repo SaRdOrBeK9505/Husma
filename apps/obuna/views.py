@@ -195,13 +195,13 @@ class ObunaSotibOlishView(APIView):
                 result = client.create_invoice(
                     obuna_id=obuna.id,
                     amount_som=tarif.narx,
-                    description=f"Husma — {tarif.nomi}",
+                    # description olib tashlandi
                 )
                 # Invoice ID ni Tolov ga saqlaymiz (webhook da qidiramiz)
-                tolov.tashqi_id = result["invoice_id"]
-                tolov.metadata  = result
+                tolov.tashqi_id = result["uuid"]  # "invoice_id" emas → "uuid"
+                tolov.metadata = result
                 tolov.save(update_fields=["tashqi_id", "metadata", "updated_at"])
-                javob["tolov_url"] = result["invoice_url"]
+                javob["tolov_url"] = result["checkout_url"]  # "invoice_url" emas → "checkout_url"
 
             except MulticardError as exc:
                 _log.error(

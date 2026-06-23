@@ -43,6 +43,17 @@ class ReviewYaratishView(CreateAPIView):
         )
         serializer.is_valid(raise_exception=True)
         review = serializer.save(user=request.user)
+
+        # Rieltor o'rtacha reytingini yangilash
+        from django.db.models import Avg, F
+        from apps.makler.models import MaklerProfil
+        avg = Review.objects.filter(rieltor=review.rieltor).aggregate(
+            o=Avg('yulduz')
+        )['o'] or 0
+        MaklerProfil.objects.filter(pk=review.rieltor_id).update(
+            ortacha_reyting=round(avg, 2)
+        )
+
         return Response(
             ReviewSerializer(review).data,
             status=status.HTTP_201_CREATED
