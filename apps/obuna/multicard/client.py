@@ -23,7 +23,7 @@ DIQQAT:
   - Invoice endpoint: POST /payment/invoice
   - Javobdagi to'lov havolasi maydoni: "checkout_url" (invoice_url EMAS)
   - Invoice identifikatori: "uuid" (Multicard tomonidan beriladi) va "invoice_id" (siz bergan)
-  - amount maydoni so'mda yuboriladi (tiyinga aylantirilmaydi) — sandbox'da albatta
+  - amount tiyinda yuboriladi (so'm * 100) — sandbox'da albatta
     bitta test invoice yaratib summani tasdiqlang, chunki hujjat misolida raqamlar
     so'rov/javobda farq qilgan.
 """
@@ -229,7 +229,7 @@ class MulticardClient:
 
         payload = {
             "store_id": self.store_id,
-            "amount": amount_som,
+            "amount": amount_som*100,
             "invoice_id": str(obuna_id),
             "lang": lang,
             "return_url": return_url or getattr(settings, "MULTICARD_RETURN_URL", ""),
@@ -271,7 +271,7 @@ class MulticardClient:
             "checkout_url": checkout_url,
             "short_link": inner.get("short_link"),
             "deeplink": inner.get("deeplink"),
-            "amount": amount_som,
+            "amount": amount_som*100,
         }
 
     def get_invoice(self, uuid: str) -> dict:
