@@ -16,7 +16,7 @@ from .views import (
     AdminTolovTasdiqlashView,
 )
 from .payme.views import PaymeWebhookView
-from .multicard.views import MulticardReturnView, MulticardCallbackView, MulticardCreateInvoiceView
+from .multicard.views import MulticardReturnView, MulticardCallbackView
 
 urlpatterns = [
     # ===== PUBLIC / RIELTOR =====
@@ -30,12 +30,13 @@ urlpatterns = [
     path('obuna/payme/webhook/', PaymeWebhookView.as_view(), name='payme-webhook'),
 
     # ===== MULTICARD =====
-    # Frontend "To'lash" tugmasi bosilganda chaqiriladi — checkout_url qaytaradi
-    path("multicard/create/", MulticardCreateInvoiceView.as_view(), name="multicard-create",),
+    # ESLATMA: Invoice yaratish endi ObunaSotibOlishView orqali amalga oshiriladi.
+    # MulticardCreateInvoiceView o'chirildi — duplikatsiya bo'lmasligi uchun.
+    # 
     # Webhook: Multicard server → sizning server (server-to-server POST)
-    path('obuna/multicard/return/', MulticardReturnView.as_view(), name='multicard-return'),
-    # Callback: Foydalanuvchi to'lovdan keyin redirect bo'ladigan URL (GET)
     path('obuna/multicard/callback/', MulticardCallbackView.as_view(), name='multicard-callback'),
+    # Return: Foydalanuvchi to'lovdan keyin redirect bo'ladigan URL (GET)
+    path('obuna/multicard/return/', MulticardReturnView.as_view(), name='multicard-return'),
 
     # ===== ADMIN: TARIF CRUD =====
     # path('admin/obuna/tariflar/', AdminTarifListCreateView.as_view(), name='admin-tarif-list'),

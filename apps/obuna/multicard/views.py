@@ -46,8 +46,16 @@ def _calc_sign(store_id, invoice_id, amount, secret: str) -> str:
     """
     Hujjat formulasi: MD5({store_id}{invoice_id}{amount}{secret})
     Qiymatlar string sifatida, bo'shliqsiz va ajratuvchisiz ulanadi.
+    
+    DIQQAT: Multicard store_id ni int yoki str yuborishi mumkin.
+    Har holda to'g'ri string ga aylantiriladi.
     """
-    raw = f"{store_id}{invoice_id}{amount}{secret}"
+    # Har bir qiymatni string ga aylantirish
+    store_id_str = str(store_id)
+    invoice_id_str = str(invoice_id)
+    amount_str = str(amount)
+    
+    raw = f"{store_id_str}{invoice_id_str}{amount_str}{secret}"
     return hashlib.md5(raw.encode("utf-8")).hexdigest()
 
 
@@ -106,153 +114,6 @@ CALLBACK_REQUEST_EXAMPLE = OpenApiExample(
     },
     request_only=True,
 )
-
-
-class MulticardCreateInvoiceView(APIView):
-    """
-    Frontend "To'lash" tugmasi bosilganda chaqiradigan endpoint.
-
-    Foydalanuvchi avtorizatsiyadan o'tgan bo'lishi shart (JWT) — shuning uchun
-    IsAuthenticated. Faqat o'zining obunasi uchun to'lov yaratishi mumkin
-    (egalik tekshiruvi pastda bor).
-    """
-    permission_classes = [IsAuthenticated]
-
-    @extend_schema(
-        summary="Multicard orqali to'lov yaratish",
-        description=(
-            "Berilgan obuna_id uchun Multicard invoice yaratadi va "
-            "foydalanuvchi yo'naltiriladigan checkout_url qaytaradi."
-        ),
-        tags=["Multicard"],
-        request={
-            "application/json": {
-                "type": "object",
-                "properties": {
-                    "obuna_id": {"type": "integer", "example": 5},
-                },
-                "required": ["obuna_id"],
-            }
-        },
-        examples=[
-            OpenApiExample(
-                "So'rov namunasi",
-                value={"obuna_id": 5},
-                request_only=True,
-            ),
-        ],
-        responses={
-            200: {
-                "type": "object",
-                "properties": {
-                    "checkout_url": {"type": "string"},
-                    "short_link": {"type": "string", "nullable": True},
-                    "amount": {"type": "integer"},
-                },
-            },
-        },
-    )
-    def post(self, request):
-        obuna_id = request.data.get("obuna_id")
-        if not obuna_id:
-            return Response(
-                {"error": "obuna_id majburiy"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            obuna = Obuna.objects.get(id=obuna_id)
-        except Obuna.DoesNotExist:
-            return Response(
-                {"error": "Obuna topilmadi"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        # --- Egalik tekshiruvi: faqat o'z obunasi uchun to'lov yaratsin ---
-        # Obuna rieltor uchun yaratiladi (foydalanuvchi maydoni yo'q)
-        try:
-            if obuna.rieltor.user_id != request.user.id:
-                logger.warning(
-                    "[Multicard] Foydalanuvchi %s o'ziga tegishli bo'lmagan obuna_id=%s uchun to'lov yaratmoqchi",
-                    request.user.id, obuna_id,
-                )
-                return Response(
-                    {"error": "Bu obuna sizga tegishli emas"},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-        except AttributeError:
-            # rieltor yoki rieltor.user mavjud emas — obuna buzilgan
-            logger.error("[Multicard] Obuna %s da rieltor mavjud emas", obuna_id)
-            return Response(
-                {"error": "Obuna ma'lumotlari noto'g'ri"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # --- Allaqachon faol/kutilayotgan to'lov bormi ---
-        mavjud_tolov = Tolov.objects.filter(
-            obuna=obuna,
-            provayder=Tolov.Provayder.MULTICARD,
-            holat=Tolov.Holat.KUTILMOQDA,
-        ).order_by("-created_at").first()
-
-        if mavjud_tolov and mavjud_tolov.metadata.get("checkout_url"):
-            logger.info(
-                "[Multicard] Mavjud kutilayotgan invoice qaytarildi: tolov_id=%s",
-                mavjud_tolov.id,
-            )
-            return Response({
-                "checkout_url": mavjud_tolov.metadata["checkout_url"],
-                "short_link": mavjud_tolov.metadata.get("short_link"),
-                "amount": mavjud_tolov.summa,
-            })
-
-        # --- Summani aniqlash (sening narxlash logikangga moslab o'zgartir) ---
-        amount_som = obuna.narx  # masalan Obuna modelida narx maydoni bo'lsa
-
-        # --- Tolov yozuvini oldindan yaratamiz (KUTILMOQDA holatida) ---
-        with transaction.atomic():
-            tolov = Tolov.objects.create(
-                obuna=obuna,
-                provayder=Tolov.Provayder.MULTICARD,
-                holat=Tolov.Holat.KUTILMOQDA,
-                summa=amount_som,
-            )
-
-        # --- Multicard'da invoice yaratamiz ---
-        client = MulticardClient()
-        try:
-            result = client.create_invoice(
-                obuna_id=obuna.id,
-                amount_som=amount_som,
-            )
-        except MulticardError as exc:
-            logger.error("[Multicard] Invoice yaratishda xato: %s", exc)
-            tolov.holat = Tolov.Holat.XATO
-            tolov.metadata = {"error": str(exc)}
-            tolov.save(update_fields=["holat", "metadata", "updated_at"])
-            return Response(
-                {"error": "To'lov tizimida xatolik yuz berdi, birozdan keyin urinib ko'ring"},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
-
-        # --- uuid va checkout_url ni saqlaymiz ---
-        tolov.tashqi_id = result["uuid"]
-        tolov.metadata = result
-        tolov.save(update_fields=["tashqi_id", "metadata", "updated_at"])
-
-        logger.info(
-            "[Multicard] Invoice yaratildi: tolov_id=%s uuid=%s",
-            tolov.id, result["uuid"],
-        )
-
-        return Response({
-            "checkout_url": result["checkout_url"],
-            "short_link": result.get("short_link"),
-            "amount": result["amount"],
-        })
-
-
-
 class MulticardCallbackView(APIView):
     """
     Multicard server-to-server callback.
@@ -312,12 +173,14 @@ class MulticardCallbackView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        # --- 2. Tolovni DB dan topish ---
+        # --- 2. Tolovni DB dan topish (uuid bo'yicha, obuna_id emas) ---
+        # Multicard callback da bir xil obuna uchun bir nechta KUTILMOQDA tolov bo'lishi mumkin.
+        # tashqi_id (uuid) bo'yicha qidirish ishonchli va unique.
         try:
             tolov = Tolov.objects.select_related("obuna").filter(
                 provayder=Tolov.Provayder.MULTICARD,
-                obuna_id=int(invoice_id) if invoice_id.isdigit() else None,
-            ).order_by("-created_at").first()
+                tashqi_id=mc_uuid,
+            ).first()
         except Exception as exc:
             logger.error("[Multicard Callback] DB xatosi: %s", exc)
             return Response(
