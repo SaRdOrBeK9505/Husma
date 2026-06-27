@@ -130,9 +130,6 @@ def _xabar_matni_tayorla(ariza_makler: ArizaMakler) -> str:
         f"📞 Tel: {telefon_str}\n"
     )
     
-    if ariza.qoshimcha_izoh:
-        matn += f"📝 Izoh: {ariza.qoshimcha_izoh}\n"
-    
     return matn
 
 
