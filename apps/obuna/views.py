@@ -57,11 +57,14 @@ class TarifListView(ListAPIView):
         if request.user.is_authenticated and hasattr(request.user, 'rieltor_profil'):
             rieltor = request.user.rieltor_profil
             
-            # Rieltorning hech qachon obunasi bormi? (barcha holatlar)
-            hech_qachon_obuna_bormi = rieltor.obunalar.exists()
+            # Rieltorning muvaffaqiyatli obunasi bormi? (FAOL yoki TUGAGAN)
+            # BEKOR va KUTILMOQDA holatlari hisobga olinmaydi - ular muvaffaqiyatsiz
+            muvaffaqiyatli_obuna_bormi = rieltor.obunalar.filter(
+                holat__in=[Obuna.Holat.FAOL, Obuna.Holat.TUGAGAN]
+            ).exists()
             
-            # Agar hech qachon obuna bo'lmagan bo'lsa - birinchi oy tarifini taklif qilamiz
-            if not hech_qachon_obuna_bormi:
+            # Agar muvaffaqiyatli obuna bo'lmagan bo'lsa - birinchi oy tarifini taklif qilamiz
+            if not muvaffaqiyatli_obuna_bormi:
                 tarif = Tarif.objects.filter(
                     kod='birinchi_oy',
                     is_active=True
@@ -72,7 +75,7 @@ class TarifListView(ListAPIView):
                     data['birinchi_oy_bormi'] = True
                     return Response([data])
             
-            # Aks holda (kamida bitta obuna sotib olgan) - oddiy oylik tarifini taklif qilamiz
+            # Aks holda (kamida bitta muvaffaqiyatli obuna sotib olgan) - oddiy oylik tarifini taklif qilamiz
             tarif = Tarif.objects.filter(
                 kod='oylik',
                 is_active=True
@@ -203,17 +206,20 @@ class ObunaSotibOlishView(APIView):
         
         # Agar tarif ko'rsatilmagan bo'lsa, avtomatik mos tarifni tanlaymiz
         if not tarif:
-            # Rieltorning hech qachon obunasi bormi? (barcha holatlar)
-            hech_qachon_obuna_bormi = rieltor.obunalar.exists()
+            # Rieltorning muvaffaqiyatli obunasi bormi? (FAOL yoki TUGAGAN)
+            # BEKOR va KUTILMOQDA holatlari hisobga olinmaydi - ular muvaffaqiyatsiz
+            muvaffaqiyatli_obuna_bormi = rieltor.obunalar.filter(
+                holat__in=[Obuna.Holat.FAOL, Obuna.Holat.TUGAGAN]
+            ).exists()
             
-            # Agar hech qachon obuna bo'lmagan bo'lsa - birinchi oy tarifini
-            if not hech_qachon_obuna_bormi:
+            # Agar muvaffaqiyatli obuna bo'lmagan bo'lsa - birinchi oy tarifini
+            if not muvaffaqiyatli_obuna_bormi:
                 tarif = Tarif.objects.filter(
                     kod='birinchi_oy',
                     is_active=True
                 ).first()
             else:
-                # Aks holda (kamida bitta obuna sotib olgan) - oddiy oylik tarifini
+                # Aks holda (kamida bitta muvaffaqiyatli obuna sotib olgan) - oddiy oylik tarifini
                 tarif = Tarif.objects.filter(
                     kod='oylik',
                     is_active=True
