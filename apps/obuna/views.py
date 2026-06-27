@@ -18,6 +18,7 @@ from apps.makler.models import MaklerProfil
 from .models import Tarif, Obuna, Tolov
 from .serializers import (
     TarifSerializer,
+    TarifRieltorSerializer,
     TarifAdminSerializer,
     ObunaSerializer,
     ObunaAdminSerializer,
@@ -37,8 +38,11 @@ _log = logging.getLogger('multicard')
 # ============================================================
 
 class TarifListView(ListAPIView):
-    """Mavjud obuna tariflari ro'yxati — hammaga ochiq."""
-    queryset = Tarif.objects.filter(is_active=True)
+    """
+    Mavjud obuna tariflari ro'yxati — hammaga ochiq.
+    Agar rieltor login qilgan bo'lsa, unga mos tarifni qaytaradi
+    (birinchi obuna bo'lsa - aktsiya narxi, aks holda - oddiy narxi).
+    """
     serializer_class = TarifSerializer
     permission_classes = [AllowAny]
     pagination_class = None
@@ -49,7 +53,43 @@ class TarifListView(ListAPIView):
         tags=["Obuna"],
     )
     def get(self, request, *args, **kwargs):
+        # Agar rieltor login qilgan bo'lsa, unga mos tarifni qaytaramiz
+        if request.user.is_authenticated and hasattr(request.user, 'rieltor_profil'):
+            rieltor = request.user.rieltor_profil
+            
+            # Rieltorning oldin obunasi bormi?
+            oldin_obuna_bormi = rieltor.obunalar.filter(
+                holat__in=[Obuna.Holat.FAOL, Obuna.Holat.TUGAGAN]
+            ).exists()
+            
+            # Agar oldin obuna bo'lmagan bo'lsa - birinchi oy tarifini taklif qilamiz
+            if not oldin_obuna_bormi:
+                tarif = Tarif.objects.filter(
+                    kod='birinchi_oy',
+                    is_active=True
+                ).first()
+                if tarif:
+                    serializer = TarifRieltorSerializer(tarif)
+                    data = serializer.data
+                    data['birinchi_oy_bormi'] = True
+                    return Response([data])
+            
+            # Aks holda - oddiy oylik tarifini taklif qilamiz
+            tarif = Tarif.objects.filter(
+                kod='oylik',
+                is_active=True
+            ).first()
+            if tarif:
+                serializer = TarifRieltorSerializer(tarif)
+                data = serializer.data
+                data['birinchi_oy_bormi'] = False
+                return Response([data])
+        
+        # Login qilmagan yoki tarif topilmagan bo'lsa - barcha tariflarni qaytaramiz
         return super().get(request, *args, **kwargs)
+    
+    def get_queryset(self):
+        return Tarif.objects.filter(is_active=True)
 
 
 class MeningObunamView(APIView):
@@ -128,6 +168,10 @@ class ObunaSotibOlishView(APIView):
 
     Obuna (kutilmoqda) + Tolov (kutilmoqda) yaratiladi.
     Payme tanlansa to'lov havolasi (tolov_url) qaytariladi.
+    
+    MUHIM: Agar tarif_id ko'rsatilmagan bo'lsa, avtomatik mos tarifni tanlaydi:
+    - Birinchi obuna bo'lsa - birinchi_oy (99,000 so'm)
+    - Aks holda - oylik (199,000 so'm)
     """
     permission_classes = [IsRieltor]
 
@@ -144,6 +188,7 @@ class ObunaSotibOlishView(APIView):
                     'summa': drf_serializers.IntegerField(),
                     'provayder': drf_serializers.CharField(),
                     'tolov_url': drf_serializers.CharField(required=False),
+                    'birinchi_oy_bormi': drf_serializers.BooleanField(),
                 }
             ),
             400: OpenApiResponse(description="Validatsiya xatosi"),
@@ -154,9 +199,35 @@ class ObunaSotibOlishView(APIView):
         serializer = ObunaYaratishSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        tarif    = serializer.context['tarif']
+        tarif    = serializer.context.get('tarif')
         provayder = serializer.validated_data['provayder']
         rieltor  = request.user.rieltor_profil
+        
+        # Agar tarif ko'rsatilmagan bo'lsa, avtomatik mos tarifni tanlaymiz
+        if not tarif:
+            # Rieltorning oldin obunasi bormi?
+            oldin_obuna_bormi = rieltor.obunalar.filter(
+                holat__in=[Obuna.Holat.FAOL, Obuna.Holat.TUGAGAN]
+            ).exists()
+            
+            # Agar oldin obuna bo'lmagan bo'lsa - birinchi oy tarifini
+            if not oldin_obuna_bormi:
+                tarif = Tarif.objects.filter(
+                    kod='birinchi_oy',
+                    is_active=True
+                ).first()
+            else:
+                # Aks holda - oddiy oylik tarifini
+                tarif = Tarif.objects.filter(
+                    kod='oylik',
+                    is_active=True
+                ).first()
+            
+            if not tarif:
+                return Response(
+                    {"error": "Mos tarif topilmadi"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
         with transaction.atomic():
             obuna = Obuna.objects.create(
@@ -172,12 +243,15 @@ class ObunaSotibOlishView(APIView):
                 holat=Tolov.Holat.KUTILMOQDA,
             )
 
+        birinchi_oy_bormi = (tarif.kod == 'birinchi_oy')
+        
         javob = {
             "message": "Obuna yaratildi. To'lovni amalga oshiring.",
             "obuna_id": obuna.id,
             "tolov_id": tolov.id,
             "summa": tolov.summa,
             "provayder": provayder,
+            "birinchi_oy_bormi": birinchi_oy_bormi,
         }
 
         # ----- PAYME -----

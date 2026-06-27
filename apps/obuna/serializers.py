@@ -14,6 +14,23 @@ class TarifSerializer(serializers.ModelSerializer):
         ]
 
 
+class TarifRieltorSerializer(serializers.ModelSerializer):
+    """
+    Rieltor uchun mos tarifni qaytaradi.
+    Agar rieltor oldin obuna qilmagan bo'lsa - birinchi oy narxi,
+    aks holda - oddiy oylik narxi.
+    """
+    birinchi_oy_bormi = serializers.BooleanField(read_only=True)
+    
+    class Meta:
+        model = Tarif
+        fields = [
+            'id', 'nomi', 'kod', 'narx',
+            'davomiylik_kun', 'izoh', 'tartib',
+            'birinchi_oy_bormi',
+        ]
+
+
 class TarifAdminSerializer(serializers.ModelSerializer):
     """Admin uchun — to'liq CRUD."""
     class Meta:
@@ -89,21 +106,26 @@ class ObunaAdminSerializer(serializers.ModelSerializer):
 class ObunaYaratishSerializer(serializers.Serializer):
     """
     Rieltor obuna sotib olishni boshlaydi.
-    tarif tanlanadi, provayder ko'rsatiladi.
+    tarif tanlanadi (ixtiyoriy - bo'lmasa avtomatik tanlanadi), provayder ko'rsatiladi.
     Natijada Obuna (kutilmoqda) + Tolov (kutilmoqda) yaratiladi.
+    
+    MUHIM: tarif_id ixtiyoriy. Ko'rsatilmagan bo'lsa:
+    - Birinchi obuna bo'lsa - birinchi_oy (99,000 so'm)
+    - Aks holda - oylik (199,000 so'm)
     """
-    tarif_id = serializers.IntegerField()
+    tarif_id = serializers.IntegerField(required=False, allow_null=True)
     provayder = serializers.ChoiceField(
         choices=Tolov.Provayder.choices,
         default=Tolov.Provayder.PAYME,
     )
 
     def validate_tarif_id(self, value):
-        try:
-            tarif = Tarif.objects.get(pk=value, is_active=True)
-        except Tarif.DoesNotExist:
-            raise serializers.ValidationError("Bunday faol tarif topilmadi")
-        self.context['tarif'] = tarif
+        if value is not None:
+            try:
+                tarif = Tarif.objects.get(pk=value, is_active=True)
+            except Tarif.DoesNotExist:
+                raise serializers.ValidationError("Bunday faol tarif topilmadi")
+            self.context['tarif'] = tarif
         return value
 
 
