@@ -53,7 +53,7 @@ def yangi_ariza_xabari_yubor(self, ariza_makler_id: int) -> dict:
             }
         
         # Rieltorning telegram_id sini tekshirish
-        telegram_id = ariza_makler.rieltor.telegram_id
+        telegram_id = ariza_makler.rieltor.user.telegram_id
         if not telegram_id:
             logger.warning(
                 f"[Ariza Notification] Rieltor {ariza_makler.rieltor.id} da telegram_id yo'q"
