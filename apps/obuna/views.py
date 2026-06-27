@@ -59,9 +59,17 @@ class TarifListView(ListAPIView):
             
             # Rieltorning muvaffaqiyatli obunasi bormi? (FAOL yoki TUGAGAN)
             # BEKOR va KUTILMOQDA holatlari hisobga olinmaydi - ular muvaffaqiyatsiz
-            muvaffaqiyatli_obuna_bormi = rieltor.obunalar.filter(
+            muvaffaqiyatli_obunalar = rieltor.obunalar.filter(
                 holat__in=[Obuna.Holat.FAOL, Obuna.Holat.TUGAGAN]
-            ).exists()
+            )
+            muvaffaqiyatli_obuna_bormi = muvaffaqiyatli_obunalar.exists()
+            
+            # Debug log
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Rieltor: {rieltor.user.telegram_id}, Obunalar soni: {rieltor.obunalar.count()}, Muvaffaqiyatli: {muvaffaqiyatli_obuna_bormi}")
+            for obuna in rieltor.obunalar.all():
+                logger.info(f"Obuna: id={obuna.id}, holat={obuna.holat}, narx={obuna.narx}")
             
             # Agar muvaffaqiyatli obuna bo'lmagan bo'lsa - birinchi oy tarifini taklif qilamiz
             if not muvaffaqiyatli_obuna_bormi:
