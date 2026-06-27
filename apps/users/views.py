@@ -182,10 +182,11 @@ class TelegramAuthView(RequestLogMixin, APIView):
             defaults={
                 'telegram_username': tg_user.get('username'),
                 'full_name': f"{tg_user.get('first_name', '')} {tg_user.get('last_name', '')}".strip(),
+                'role': CustomUser.Role.USER,  # Default role
             }
         )
 
-        _auth_log.info(f"User {'yaratildi' if created else 'topildi'}: id={user.id}, telegram_id={user.telegram_id}, is_active={user.is_active}")
+        _auth_log.info(f"User {'yaratildi' if created else 'topildi'}: id={user.id}, telegram_id={user.telegram_id}, role={user.role}, is_active={user.is_active}")
 
         if not created:
             user.telegram_username = tg_user.get('username', user.telegram_username)
