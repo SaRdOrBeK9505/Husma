@@ -41,6 +41,8 @@ def arizani_rieltorlarga_yuborish(ariza: Ariza) -> int:
         )
         if created:
             yuborildi += 1
+            # Yangi ariza biriktirilganda notification yuborish
+            _xabar_navbatiga_qosh(rieltor, ariza)
 
     return yuborildi
 
@@ -51,25 +53,29 @@ arizani_maklerlarga_yuborish = arizani_rieltorlarga_yuborish
 
 def _xabar_navbatiga_qosh(rieltor, ariza) -> None:
     """
-    [KELAJAK EXTENSION POINT — hozir bo'sh]
+    Celery orqali rieltorga yangi ariza haqida Telegram xabari yuboradi.
 
-    Bu funksiya kelajakda Telegram xabarini to'g'ridan-to'g'ri YUBORMASDAN,
-    alohida navbat jadvaliga (`TelegramXabarNavbati` kabi) yozuv qo'shishi kerak.
-    Haqiqiy yuborish PythonAnywhere Scheduled Task orqali ishlaydigan alohida
-    management command'da (`python manage.py telegram_xabar_yuboruvchi`) amalga
-    oshirilishi kerak.
+    Bu funksiya HTTP request ichida sinxron Telegram API chaqirig'i qilmaydi.
+    Buning o'rniga Celery task'ni background'da ishga tushiradi.
 
-    MUHIM: Bu funksiya HECH QACHON HTTP request ichida sinxron Telegram API
-    chaqirig'i qilmasligi kerak — PythonAnywhere'da bu so'rovni "osilib qolish"
-    holatiga olib kelishi mumkin.
+    Idempotent: bir xil ariza_makler uchun bir necha marta chaqirilsa ham,
+    faqat bitta xabar yuboriladi (task ichida holat tekshiriladi).
 
     Parametrlar:
         rieltor: MaklerProfil — xabar yuborish kerak bo'lgan rieltor
         ariza:   Ariza        — yangi biriktirilgan ariza
     """
-    # TODO: bu yerda TelegramXabarNavbati.objects.create(rieltor=rieltor, ariza=ariza)
-    #       yoziladi, real model/jadval tayyor bo'lgach.
-    pass
+    from .tasks import yangi_ariza_xabari_yubor
+
+    # ArizaMaklerni topish
+    ariza_makler = ArizaMakler.objects.filter(
+        ariza=ariza,
+        rieltor=rieltor
+    ).first()
+
+    if ariza_makler:
+        # Celery task'ni background'da ishga tushirish
+        yangi_ariza_xabari_yubor.delay(ariza_makler.id)
 
 
 def yangi_rieltorga_eski_arizalarni_biriktir(
