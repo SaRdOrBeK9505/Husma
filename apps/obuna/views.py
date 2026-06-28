@@ -53,7 +53,22 @@ class TarifListView(ListAPIView):
         tags=["Obuna"],
     )
     def get(self, request, *args, **kwargs):
-        logger = logging.getLogger('telegram_auth')
+        # Alohida logger - logs/obuna.log fayliga yozadi
+        import logging
+        from pathlib import Path
+        from django.conf import settings
+        
+        log_file = Path(settings.BASE_DIR) / 'logs' / 'obuna.log'
+        log_file.parent.mkdir(exist_ok=True)
+        
+        logger = logging.getLogger('obuna')
+        logger.setLevel(logging.INFO)
+        
+        if not logger.handlers:
+            file_handler = logging.FileHandler(log_file, encoding='utf-8')
+            file_handler.setFormatter(logging.Formatter('{asctime} [{levelname}] {message}', style='{'))
+            logger.addHandler(file_handler)
+        
         logger.info("=== TarifListView GET START ===")
         logger.info(f"User authenticated: {request.user.is_authenticated}")
         logger.info(f"User: {request.user}")
