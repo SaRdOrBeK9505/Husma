@@ -44,7 +44,7 @@ class TarifListView(ListAPIView):
     (birinchi obuna bo'lsa - aktsiya narxi, aks holda - oddiy narxi).
     """
     serializer_class = TarifSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsRieltor]
     pagination_class = None
 
     @extend_schema(
