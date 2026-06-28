@@ -53,49 +53,67 @@ class TarifListView(ListAPIView):
         tags=["Obuna"],
     )
     def get(self, request, *args, **kwargs):
-        # Agar rieltor login qilgan bo'lsa, unga mos tarifni qaytaramiz
-        if request.user.is_authenticated and hasattr(request.user, 'rieltor_profil'):
-            rieltor = request.user.rieltor_profil
-            
-            # Rieltorning muvaffaqiyatli obunasi bormi? (FAOL yoki TUGAGAN)
-            # BEKOR va KUTILMOQDA holatlari hisobga olinmaydi - ular muvaffaqiyatsiz
-            muvaffaqiyatli_obunalar = rieltor.obunalar.filter(
-                holat__in=[Obuna.Holat.FAOL, Obuna.Holat.TUGAGAN]
-            )
-            muvaffaqiyatli_obuna_bormi = muvaffaqiyatli_obunalar.exists()
-            
-            # Debug log
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"Rieltor: {rieltor.user.telegram_id}, Obunalar soni: {rieltor.obunalar.count()}, Muvaffaqiyatli: {muvaffaqiyatli_obuna_bormi}")
-            for obuna in rieltor.obunalar.all():
-                logger.info(f"Obuna: id={obuna.id}, holat={obuna.holat}, narx={obuna.narx}")
-            
-            # Agar muvaffaqiyatli obuna bo'lmagan bo'lsa - birinchi oy tarifini taklif qilamiz
-            if not muvaffaqiyatli_obuna_bormi:
+        logger = logging.getLogger(__name__)
+        logger.info("=== TarifListView GET START ===")
+        logger.info(f"User authenticated: {request.user.is_authenticated}")
+        logger.info(f"User: {request.user}")
+
+        try:
+            # Agar rieltor login qilgan bo'lsa, unga mos tarifni qaytaramiz
+            if request.user.is_authenticated and hasattr(request.user, 'rieltor_profil'):
+                rieltor = request.user.rieltor_profil
+                logger.info(f"Rieltor profil topildi: {rieltor.user.full_name}")
+
+                # Rieltorning muvaffaqiyatli obunasi bormi? (FAOL yoki TUGAGAN)
+                # BEKOR va KUTILMOQDA holatlari hisobga olinmaydi - ular muvaffaqiyatsiz
+                muvaffaqiyatli_obunalar = rieltor.obunalar.filter(
+                    holat__in=[Obuna.Holat.FAOL, Obuna.Holat.TUGAGAN]
+                )
+                muvaffaqiyatli_obuna_bormi = muvaffaqiyatli_obunalar.exists()
+
+                logger.info(f"Jami obunalar: {rieltor.obunalar.count()}")
+                logger.info(f"Muvaffaqiyatli obunalar: {muvaffaqiyatli_obuna_bormi}")
+                for obuna in rieltor.obunalar.all():
+                    logger.info(f"Obuna: id={obuna.id}, holat={obuna.holat}, narx={obuna.narx}")
+
+                # Agar muvaffaqiyatli obuna bo'lmagan bo'lsa - birinchi oy tarifini taklif qilamiz
+                if not muvaffaqiyatli_obuna_bormi:
+                    logger.info("Birinchi oy tarifini qaytarish")
+                    tarif = Tarif.objects.filter(
+                        kod='birinchi_oy',
+                        is_active=True
+                    ).first()
+                    if tarif:
+                        logger.info(f"Birinchi oy tarif topildi: {tarif.nomi}")
+                        serializer = TarifRieltorSerializer(tarif)
+                        data = serializer.data
+                        data['birinchi_oy_bormi'] = True
+                        return Response([data])
+                    else:
+                        logger.error("Birinchi oy tarif topilmadi!")
+
+                # Aks holda (kamida bitta muvaffaqiyatli obuna sotib olgan) - oddiy oylik tarifini taklif qilamiz
+                logger.info("Oylik tarifini qaytarish")
                 tarif = Tarif.objects.filter(
-                    kod='birinchi_oy',
+                    kod='oylik',
                     is_active=True
                 ).first()
                 if tarif:
+                    logger.info(f"Oylik tarif topildi: {tarif.nomi}")
                     serializer = TarifRieltorSerializer(tarif)
                     data = serializer.data
-                    data['birinchi_oy_bormi'] = True
+                    data['birinchi_oy_bormi'] = False
                     return Response([data])
-            
-            # Aks holda (kamida bitta muvaffaqiyatli obuna sotib olgan) - oddiy oylik tarifini taklif qilamiz
-            tarif = Tarif.objects.filter(
-                kod='oylik',
-                is_active=True
-            ).first()
-            if tarif:
-                serializer = TarifRieltorSerializer(tarif)
-                data = serializer.data
-                data['birinchi_oy_bormi'] = False
-                return Response([data])
-        
-        # Login qilmagan yoki rieltor bo'lmagan bo'lsa - barcha tariflarni qaytaramiz
-        return super().get(request, *args, **kwargs)
+                else:
+                    logger.error("Oylik tarif topilmadi!")
+
+            # Login qilmagan yoki rieltor bo'lmagan bo'lsa - barcha tariflarni qaytaramiz
+            logger.info("Barcha tariflarni qaytarish (login qilmagan yoki rieltor emas)")
+            return super().get(request, *args, **kwargs)
+
+        except Exception as e:
+            logger.error(f"TarifListView xatolik: {e}", exc_info=True)
+            raise
     
     def get_queryset(self):
         return Tarif.objects.filter(is_active=True)
