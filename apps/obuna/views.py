@@ -53,7 +53,7 @@ class TarifListView(ListAPIView):
         tags=["Obuna"],
     )
     def get(self, request, *args, **kwargs):
-        logger = logging.getLogger(__name__)
+        logger = logging.getLogger('telegram_auth')
         logger.info("=== TarifListView GET START ===")
         logger.info(f"User authenticated: {request.user.is_authenticated}")
         logger.info(f"User: {request.user}")
