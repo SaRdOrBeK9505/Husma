@@ -239,12 +239,15 @@ class KontaktMalumot(models.Model):
 class UserStatistika(models.Model):
     """
     Singleton model — User paneli uchun admin tomonidan boshqariladigan sozlamalar.
-
-    ESLATMA: bitimlar va rieltor_soni ENDI bu modelda saqlanmaydi —
-    ular /api/statistika/ endpoint'idan DB'dan real-time hisoblanadi
-    (ArizaMakler.holat='boglandi' va MaklerProfil.verify_holat='verified').
-    Bu modelda faqat hisoblash qiyin bo'lgan javob_vaqti qoldirildi.
     """
+    bitimlar_soni = models.IntegerField(
+        default=500,
+        help_text="Bitimlar soni — admin paneldan kiritiladi"
+    )
+    rieltorlar_soni = models.IntegerField(
+        default=50,
+        help_text="Rieltorlar soni — admin paneldan kiritiladi"
+    )
     javob_vaqti = models.CharField(
         max_length=10,
         default="2s",

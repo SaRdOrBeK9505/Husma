@@ -34,7 +34,7 @@ class SliderListView(generics.ListAPIView):
     """
     Autentifikatsiya qilingan foydalanuvchi roli bo'yicha
     mos slider kartochkalarini qaytaradi.
-    - role='makler' → rieltor panel sliderlari
+    - role='makler' → hamma sliderlar (USER va RIELTOR)
     - boshqalar → user panel sliderlari
     """
     serializer_class = SliderKartaSerializer
@@ -46,8 +46,18 @@ class SliderListView(generics.ListAPIView):
         description=(
             "Autentifikatsiya qilingan foydalanuvchi roliga qarab "
             "mos panel sliderlari qaytariladi. "
-            "Makler → rieltor sliderlari, user → user sliderlari."
+            "Makler → hamma sliderlar (USER va RIELTOR), user → user sliderlari. "
+            "Rieltor panel_turi parametri bilan filterlashi mumkin: ?panel_turi=user yoki ?panel_turi=rieltor"
         ),
+        parameters=[
+            OpenApiParameter(
+                name='panel_turi',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description="Filter: 'user' yoki 'rieltor' (faqat rieltorlar uchun)",
+                required=False,
+            )
+        ],
         responses={200: SliderKartaSerializer(many=True)},
         tags=["Settings"],
     )
@@ -59,11 +69,18 @@ class SliderListView(generics.ListAPIView):
         if getattr(self, 'swagger_fake_view', False):
             return SliderKarta.objects.none()
 
+        # Rieltor panel_turi bo'yicha filterlashi mumkin
+        panel_turi = self.request.query_params.get('panel_turi')
+
         if self.request.user.role == 'makler':
-            panel = SliderKarta.PanelTuri.RIELTOR
+            # Rieltor filter bilan yoki filtersiz hamma sliderlarni ko'radi
+            if panel_turi in [SliderKarta.PanelTuri.USER, SliderKarta.PanelTuri.RIELTOR]:
+                return SliderKarta.objects.filter(panel_turi=panel_turi, faol=True)
+            return SliderKarta.objects.filter(faol=True)
         else:
+            # User faqat USER panel sliderlarini ko'radi
             panel = SliderKarta.PanelTuri.USER
-        return SliderKarta.objects.filter(panel_turi=panel, faol=True)
+            return SliderKarta.objects.filter(panel_turi=panel, faol=True)
 
 
 # ===== SLIDER — ADMIN CRUD =====
@@ -171,50 +188,45 @@ class SiteSettingsView(APIView):
 
 class UserStatistikaView(APIView):
     """
-    User paneli — bitimlar va rieltor_soni DB'dan real hisoblanadi.
-    javob_vaqti admin nazoratida (UserStatistika modelidan).
+    User paneli — statistika admin nazoratida (UserStatistika modelidan).
     """
     permission_classes = [AllowAny]
 
     @extend_schema(
         summary="User paneli statistikasi",
         description=(
-            "Dinamik statistika: bitimlar va rieltor_soni bazadan real hisoblanadi. "
-            "javob_vaqti admin tomonidan kiritilgan."
+            "Statistika: bitimlar_soni, rieltorlar_soni va javob_vaqti "
+            "admin tomonidan kiritilgan."
         ),
         responses={200: UserStatistikaSerializer},
         tags=["Settings"],
     )
     def get(self, request):
-        from apps.makler.models import MaklerProfil
+        # from apps.makler.models import MaklerProfil
 
-        # Yopilgan (bog'langan) bitimlar soni — ArizaMakler'dan real hisob
-        bitimlar = ArizaMakler.objects.filter(
-            holat=ArizaMakler.Holat.BOGLANDI
-        ).count()
+        # # Yopilgan (bog'langan) bitimlar soni — ArizaMakler'dan real hisob
+        # bitimlar = ArizaMakler.objects.filter(
+        #     holat=ArizaMakler.Holat.BOGLANDI
+        # ).count()
 
-        # Tasdiqlangan (bloklangmagan) rieltorlar soni
-        rieltor_soni = MaklerProfil.objects.filter(
-            verify_holat=MaklerProfil.VerifyHolat.VERIFIED
-        ).count()
+        # # Tasdiqlangan (bloklangmagan) rieltorlar soni
+        # rieltor_soni = MaklerProfil.objects.filter(
+        #     verify_holat=MaklerProfil.VerifyHolat.VERIFIED
+        # ).count()
 
-        # Javob vaqti admin nazoratida — singleton modeldan
+        # Statistika admin nazoratida — singleton modeldan
         stat = UserStatistika.get()
 
-        serializer = UserStatistikaSerializer({
-            'bitimlar': bitimlar,
-            'rieltor_soni': rieltor_soni,
-            'javob_vaqti': stat.javob_vaqti,
-        })
+        serializer = UserStatistikaSerializer(stat)
         return Response(serializer.data)
 
 
 class UserStatistikaAdminView(APIView):
-    """Admin — javob_vaqti ni tahrirlash"""
+    """Admin — statistikani tahrirlash"""
     permission_classes = [IsAdminUser]
 
     @extend_schema(
-        summary="[Admin] Javob vaqtini ko'rish",
+        summary="[Admin] Statistikani ko'rish",
         responses={200: UserStatistikaAdminSerializer},
         tags=["Admin – Settings"],
     )
@@ -223,7 +235,7 @@ class UserStatistikaAdminView(APIView):
         return Response(UserStatistikaAdminSerializer(stat).data)
 
     @extend_schema(
-        summary="[Admin] Javob vaqtini tahrirlash",
+        summary="[Admin] Statistikani tahrirlash",
         request=UserStatistikaAdminSerializer,
         responses={200: UserStatistikaAdminSerializer},
         tags=["Admin – Settings"],
@@ -237,7 +249,7 @@ class UserStatistikaAdminView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @extend_schema(
-        summary="[Admin] Javob vaqtini to'liq yangilash",
+        summary="[Admin] Statistikani to'liq yangilash",
         request=UserStatistikaAdminSerializer,
         responses={200: UserStatistikaAdminSerializer},
         tags=["Admin – Settings"],

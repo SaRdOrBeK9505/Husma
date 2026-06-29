@@ -74,11 +74,10 @@ class KontaktMalumotAdmin(admin.ModelAdmin):
 class UserStatistikaAdmin(admin.ModelAdmin):
     fieldsets = (
         ("📊 User paneli statistikasi", {
-            'fields': ('javob_vaqti',),
+            'fields': ('bitimlar_soni', 'rieltorlar_soni', 'javob_vaqti',),
             'description': (
-                "Javob vaqti frontendda '2s', '5min' ko'rinishida chiqadi. "
-                "Bitimlar soni va rieltorlar soni endi DB dan real-time hisoblanadi "
-                "(ArizaMakler.holat='boglandi' va MaklerProfil.verify_holat='verified')."
+                "Bitimlar soni, rieltorlar soni va javob vaqti admin tomonidan kiritiladi. "
+                "Frontendda '500+', '50+', '2s' ko'rinishida chiqadi."
             )
         }),
         ("ℹ️ Ma'lumot", {
