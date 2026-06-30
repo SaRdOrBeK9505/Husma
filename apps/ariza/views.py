@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
 from django.db import transaction
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, inline_serializer
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse, inline_serializer, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 from rest_framework import serializers as drf_serializers
 
@@ -15,6 +15,9 @@ from core.permissions import IsUser, IsVerifiedRieltor, IsAdmin, IsUserOrRieltor
 from .models import Ariza, ArizaMakler
 from .serializers import ArizaYaratishSerializer, ArizaSerializer, MaklerArizaSerializer
 from .services import arizani_maklerlarga_yuborish
+from apps.users.models import CustomUser
+from apps.makler.models import MaklerProfil
+from django.db.models import Count, Q
 
 
 class ArizaYaratishView(CreateAPIView):
@@ -412,6 +415,16 @@ class AdminArizalarView(ListAPIView):
 
     @extend_schema(
         summary="Barcha arizalar (Admin)",
+        parameters=[
+            OpenApiParameter(
+                name='holat',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description="Holat bo'yicha filter: yangi | korilmoqda | yopilgan",
+                required=False,
+                enum=['yangi', 'korilmoqda', 'yopilgan'],
+            )
+        ],
         responses={200: ArizaSerializer(many=True)},
         tags=["Admin"],
     )
@@ -421,6 +434,79 @@ class AdminArizalarView(ListAPIView):
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
             return Ariza.objects.none()
-        return Ariza.objects.select_related(
+        
+        qs = Ariza.objects.select_related(
             'hudud', 'user'
         ).prefetch_related('ariza_rieltorlar')
+        
+        holat = self.request.query_params.get('holat')
+        if holat in ['yangi', 'korilmoqda', 'yopilgan']:
+            qs = qs.filter(holat=holat)
+        
+        return qs
+
+class AdminDashboardStatsView(APIView):
+    """
+    Admin dashboard statistikasi.
+    Jami arizalar, rieltorlar, userlar va holat bo'yicha statistika.
+    """
+    permission_classes = [IsAdmin]
+
+    @extend_schema(
+        summary="Dashboard statistikasi (Admin)",
+        responses={
+            200: OpenApiResponse(
+                description="Dashboard statistikasi",
+                examples=[OpenApiExample(
+                    name="Success",
+                    value={
+                        "jami_arizalar": 87,
+                        "jami_rieltorlar": 14,
+                        "jami_userlar": 356,
+                        "yangi_arizalar": 5,
+                        "ariza_holatlari": {
+                            "yangi": 3,
+                            "korilmoqda": 3,
+                            "yopilgan": 3
+                        }
+                    }
+                )]
+            )
+        },
+        tags=["Admin"],
+    )
+    def get(self, request):
+        # Jami statistikalar
+        jami_arizalar = Ariza.objects.count()
+        jami_rieltorlar = CustomUser.objects.filter(role='makler').count()
+        jami_userlar = CustomUser.objects.filter(role='user').count()
+        
+        # Yangi arizalar (bugun yaratilgan)
+        bugun = timezone.now().date()
+        yangi_arizalar = Ariza.objects.filter(
+            created_at__date=bugun
+        ).count()
+        
+        # Holat bo'yicha statistika
+        ariza_holatlari = Ariza.objects.values('holat').annotate(
+            count=Count('id')
+        ).order_by('holat')
+        
+        holat_stats = {
+            'yangi': 0,
+            'korilmoqda': 0,
+            'yopilgan': 0
+        }
+        
+        for item in ariza_holatlari:
+            holat = item['holat']
+            if holat in holat_stats:
+                holat_stats[holat] = item['count']
+        
+        return Response({
+            'jami_arizalar': jami_arizalar,
+            'jami_rieltorlar': jami_rieltorlar,
+            'jami_userlar': jami_userlar,
+            'yangi_arizalar': yangi_arizalar,
+            'ariza_holatlari': holat_stats,
+        })

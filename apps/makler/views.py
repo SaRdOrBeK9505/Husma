@@ -4,7 +4,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 
 from core.permissions import IsRieltor, IsAdmin
 from .models import MaklerProfil, CustomUser
@@ -129,10 +130,53 @@ class AdminRieltorListView(ListAPIView):
     serializer_class = RieltorProfilSerializer
 
     def get_queryset(self):
-        return MaklerProfil.objects.select_related('user').prefetch_related('hududlar')
+        from django.db.models import Q
+        from datetime import timedelta
+        
+        qs = MaklerProfil.objects.select_related('user').prefetch_related('hududlar')
+        
+        # Filter by verify_holat
+        verify_holat = self.request.query_params.get('verify_holat')
+        if verify_holat in ['verified', 'pending', 'rejected']:
+            qs = qs.filter(verify_holat=verify_holat)
+        
+        # Filter by faol status
+        faol = self.request.query_params.get('faol')
+        if faol == 'true':
+            # Filter for active rieltors (not blocked and has active subscription or trial)
+            now = timezone.now()
+            qs = qs.filter(verify_holat='verified').filter(
+                Q(bepul_muddat_tugash__gte=now) | Q(obunalar__tugash_vaqti__gte=now, obunalar__holat='active')
+            ).distinct()
+        elif faol == 'false':
+            # Filter for inactive rieltors
+            now = timezone.now()
+            qs = qs.filter(
+                Q(verify_holat='rejected') |
+                Q(bepul_muddat_tugash__lt=now)
+            ).distinct()
+        
+        return qs
 
     @extend_schema(
         summary="Barcha rieltorlar ro'yxati (Admin)",
+        parameters=[
+            OpenApiParameter(
+                name='verify_holat',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description="Verify holat bo'yicha filter: verified | pending | rejected",
+                required=False,
+                enum=['verified', 'pending', 'rejected'],
+            ),
+            OpenApiParameter(
+                name='faol',
+                type=OpenApiTypes.BOOL,
+                location=OpenApiParameter.QUERY,
+                description="Faollik holati bo'yicha filter: true | false",
+                required=False,
+            ),
+        ],
         responses={200: RieltorProfilSerializer(many=True)},
         tags=["Admin"],
     )

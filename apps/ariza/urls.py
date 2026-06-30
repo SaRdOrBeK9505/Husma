@@ -7,6 +7,7 @@ from .views import (
     RieltorArizaQabulView,
     RieltorArizaYopishView,
     AdminArizalarView,
+    AdminDashboardStatsView,
     UserArizaDetailView,
 )
 
@@ -24,4 +25,5 @@ urlpatterns = [
 
     # Admin
     path('admin/arizalar/', AdminArizalarView.as_view(), name='admin-arizalar'),
+    path('admin/dashboard-stats/', AdminDashboardStatsView.as_view(), name='admin-dashboard-stats'),
 ]
