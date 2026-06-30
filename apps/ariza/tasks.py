@@ -8,7 +8,7 @@ from django.conf import settings
 from celery import shared_task
 from celery.exceptions import Retry
 
-from .models import ArizaMakler
+from .models import Ariza, ArizaMakler
 
 logger = logging.getLogger(__name__)
 
@@ -154,3 +154,105 @@ def _telegram_yubor(chat_id: str, text: str) -> None:
     data = response.json()
     if not data.get('ok'):
         raise ValueError(f"Telegram API xatosi: {data}")
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def kanalga_yangi_ariza_xabari_yubor(self, ariza_id: int) -> dict:
+    """
+    Yangi ariza haqida Telegram kanalga xabar yuboradi.
+    
+    Idempotent: bir xil ariza_id uchun bir necha marta chaqirilsa ham,
+    faqat bitta xabar yuboriladi (ariza holatini tekshiradi).
+    
+    Retry: xato bo'lsa 3 marta qayta urinadi (har biridan keyin 1 daqiqa).
+    
+    Args:
+        ariza_id: Ariza modeli ID si
+        
+    Returns:
+        dict: {"success": bool, "message": str}
+    """
+    try:
+        # Arizani olish
+        ariza = Ariza.objects.select_related(
+            'mulk_turi',
+            'hudud'
+        ).get(id=ariza_id)
+        
+        # Idempotency tekshiruvi: faqat yangi holatdagi arizalar uchun
+        if ariza.holat != Ariza.Holat.YANGI:
+            logger.info(
+                f"[Kanal Notification] Ariza {ariza_id} allaqachon "
+                f"{ariza.holat} holatida, kanalga xabar yuborilmadi."
+            )
+            return {
+                "success": False,
+                "message": f"Ariza allaqachon {ariza.holat} holatida"
+            }
+        
+        # Xabar matnini tayyorlash
+        mulk_turi = ariza.mulk_turi.nomi if ariza.mulk_turi else "Noma'lum"
+        hudud = ariza.hudud.nomi if ariza.hudud else "Noma'lum"
+        narx = f"{ariza.narx_min:,} - {ariza.narx_max:,} so'm"
+        telefon_str = ariza.telefon or "Ko'rsatilmagan"
+        
+        xabar_matni = (
+            f"📋 *Yangi ariza tushdi!*\n\n"
+            f"🏠 Mulk turi: {mulk_turi}\n"
+            f"📍 Hudud: {hudud}\n"
+            f"💰 Narx: {narx}\n"
+            f"📞 Tel: {telefon_str}\n"
+        )
+        
+        # Kanalga yuborish
+        from core.telegram_utils import telegram_kanalga_yubor
+        yuborildi = telegram_kanalga_yubor(xabar_matni)
+        
+        if yuborildi:
+            logger.info(
+                f"[Kanal Notification] Ariza {ariza_id} haqida kanalga xabar yuborildi"
+            )
+            return {
+                "success": True,
+                "message": "Kanalga xabar muvaffaqiyatli yuborildi"
+            }
+        else:
+            logger.warning(
+                f"[Kanal Notification] Ariza {ariza_id} haqida kanalga xabar yuborilmadi"
+            )
+            return {
+                "success": False,
+                "message": "Kanalga xabar yuborilmadi"
+            }
+        
+    except Ariza.DoesNotExist:
+        logger.error(
+            f"[Kanal Notification] Ariza {ariza_id} topilmadi"
+        )
+        return {
+            "success": False,
+            "message": "Ariza topilmadi"
+        }
+        
+    except Exception as exc:
+        logger.error(
+            f"[Kanal Notification] Xato: ariza_id={ariza_id}, err={exc}",
+            exc_info=True
+        )
+        
+        # Retry mechanism - 3 marta qayta urinish
+        if self.request.retries < self.max_retries:
+            logger.info(
+                f"[Kanal Notification] Qayta urinish: {self.request.retries + 1}/{self.max_retries}"
+            )
+            raise self.retry(exc=exc)
+        
+        # Barcha urinishlar muvaffaqiyatsiz bo'lsa
+        return {
+            "success": False,
+            "message": f"Xato: {str(exc)}"
+        }

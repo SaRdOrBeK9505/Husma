@@ -192,6 +192,7 @@ SIMPLE_JWT = {
 # (yuqorida if/else bilan sozlangan)
 
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+TELEGRAM_NOTIFY_CHANNEL_ID = os.getenv('TELEGRAM_NOTIFY_CHANNEL_ID', '')
 
 # ===== PAYME MERCHANT API =====
 # Payme Business kabinetdan olinadi (test: https://test.paycom.uz)

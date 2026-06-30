@@ -34,6 +34,19 @@ class ArizaYaratishView(CreateAPIView):
         serializer.is_valid(raise_exception=True)
         ariza = serializer.save(user=request.user)
         yuborildi = arizani_maklerlarga_yuborish(ariza)
+        
+        # Kanalga yangi ariza haqida xabar yuborish (background task)
+        try:
+            from .tasks import kanalga_yangi_ariza_xabari_yubor
+            kanalga_yangi_ariza_xabari_yubor.delay(ariza.id)
+        except Exception as e:
+            # Xato bo'lsa asosiy oqimni to'xtatmaymiz, faqat loglaymiz
+            import logging
+            logging.getLogger(__name__).error(
+                f"Kanalga ariza xabari yuborilmadi: {e}",
+                exc_info=True
+            )
+        
         return Response({
             'ariza': ArizaSerializer(ariza).data,
             'rieltorlarga_yuborildi': yuborildi,
