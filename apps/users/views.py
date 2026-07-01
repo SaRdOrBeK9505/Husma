@@ -16,11 +16,15 @@ from .otp_service import kode_generatsiya, otp_yuborish
 from .serializers import (
     TelegramAuthSerializer,
     UserSerializer,
-    RieltorLoginSerializer,
     RieltorOTPSorovSerializer,
     RieltorOTPVerifySerializer,
+    AdminLoginSerializer,
+    AdminUserSerializer,
+    AdminChangePasswordSerializer,
 )
 from .auth import verify_telegram_auth, parse_webapp_user, parse_webapp_user_dict
+from .tokens import get_tokens_for_user
+from .permissions import IsAdminUser
 
 import logging as _logging
 import json as _json
@@ -197,7 +201,7 @@ class TelegramAuthView(RequestLogMixin, APIView):
             user.save(update_fields=['telegram_username', 'full_name'])
 
         try:
-            refresh = RefreshToken.for_user(user)
+            tokens = get_tokens_for_user(user)
             _auth_log.info(f"JWT token yaratildi: user_id={user.id}")
         except Exception as e:
             _auth_log.error(f"JWT token yaratishda xato: {e}", exc_info=True)
@@ -207,8 +211,7 @@ class TelegramAuthView(RequestLogMixin, APIView):
             )
 
         return Response({
-            'access': str(refresh.access_token),
-            'refresh': str(refresh),
+            **tokens,
             'user': UserSerializer(user).data,
             'is_new': created,
         }, status=status.HTTP_200_OK)
@@ -238,93 +241,7 @@ class MeView(APIView):
         return Response(serializer.data)
 
 
-# ===== RIELTOR AUTH =====
-
-class RieltorLoginView(RequestLogMixin, APIView):
-    permission_classes = [AllowAny]
-    throttle_classes = [AuthRateThrottle]
-    log_nomi = "RIELTOR LOGIN"
-
-    @extend_schema(
-        summary="Rieltor kirish",
-        description="Username va parol bilan kirish.",
-        request=RieltorLoginSerializer,
-        responses={
-            200: OpenApiResponse(
-                description="Muvaffaqiyatli kirish",
-                examples=[OpenApiExample(
-                    name="Success",
-                    value={
-                        "access": "eyJ...",
-                        "refresh": "eyJ...",
-                        "rieltor": {
-                            "id": 1,
-                            "username": "ali_rieltor",
-                            "full_name": "Ali Valiyev",
-                            "faol": True,
-                            "bepul_muddat_tugash": "2026-06-11T10:00:00Z",
-                        }
-                    }
-                )]
-            ),
-            401: OpenApiResponse(description="Username yoki parol noto'g'ri"),
-            403: OpenApiResponse(description="Rieltor profil topilmadi"),
-        },
-        tags=["Auth"],
-    )
-    def post(self, request):
-        serializer = RieltorLoginSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        username = serializer.validated_data['username']
-        password = serializer.validated_data['password']
-
-        try:
-            user = CustomUser.objects.get(username=username)
-        except CustomUser.DoesNotExist:
-            return Response(
-                {'error': "Username yoki parol noto'g'ri"},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-
-        if not user.check_password(password):
-            return Response(
-                {'error': "Username yoki parol noto'g'ri"},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-
-        if user.role != CustomUser.Role.MAKLER:
-            return Response(
-                {'error': "Bu kirish faqat rieltorlar uchun"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        try:
-            rieltor = user.rieltor_profil
-        except MaklerProfil.DoesNotExist:
-            return Response(
-                {'error': "Rieltor profil topilmadi"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        refresh = RefreshToken.for_user(user)
-
-        return Response({
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-            "rieltor": {
-                "id": user.id,
-                "username": user.username,
-                "full_name": user.full_name,
-                "phone": user.phone,
-                "role": user.role,
-                "faol": rieltor.faol,
-                "bepul_muddat_tugash": rieltor.bepul_muddat_tugash,
-                "bio": rieltor.bio,
-                "telegram_link": rieltor.telegram_link,
-            }
-        }, status=status.HTTP_200_OK)
-
+# ===== RIELTOR AUTH (Faqat Telegram orqali, username/password KERAK EMAS) =====
 
 class RieltorFaollikView(APIView):
     """Rieltor bepul muddat yoki obuna holatini tekshiradi."""
@@ -444,8 +361,6 @@ class RieltorOTPSorovView(RequestLogMixin, APIView):
             register_data={
                 'full_name': data['full_name'],
                 'phone': data['phone'],
-                'username': data['username'],
-                'password': data['password'],
                 'hududlar': [h.id for h in data['hududlar']],
                 'mulk_turlari': [m.id for m in data['mulk_turlari']],
             }
@@ -555,13 +470,12 @@ class RieltorOTPVerifyView(RequestLogMixin, APIView):
 
         reg = otp.register_data
 
-        # request.user ni yangilaymiz
+        # request.user ni yangilaymiz (username va password KERAK EMAS - rieltor faqat Telegram orqali ishlaydi)
         user = request.user
         user.full_name = reg['full_name']
         user.phone = reg['phone']
-        user.username = reg['username']
         user.role = CustomUser.Role.MAKLER
-        user.set_password(reg['password'])
+        # Username va parol o'rnatilmaydi - rieltor faqat Telegram auth orqali kiradi
         user.save()
 
         # Rieltor profil — 7 kunlik bepul muddat bilan
@@ -600,7 +514,6 @@ class RieltorOTPVerifyView(RequestLogMixin, APIView):
             "message": "Ro'yxatdan o'tdingiz. 7 kunlik bepul sinov muddati boshlandi.",
             "rieltor": {
                 "id": user.id,
-                "username": user.username,
                 "full_name": user.full_name,
                 "phone": user.phone,
                 "role": user.role,
@@ -608,3 +521,154 @@ class RieltorOTPVerifyView(RequestLogMixin, APIView):
                 "bepul_muddat_tugash": rieltor.bepul_muddat_tugash,
             }
         }, status=status.HTTP_201_CREATED)
+
+
+# ===== ADMIN AUTH =====
+
+class AdminLoginView(RequestLogMixin, APIView):
+    """
+    Admin panel uchun login.
+    Username va parol bilan kirish.
+    Faqat role='admin' yoki is_staff=True bo'lgan userlar kirishi mumkin.
+    """
+    permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
+    log_nomi = "ADMIN LOGIN"
+
+    @extend_schema(
+        summary="Admin panel login",
+        description=(
+            "Admin username va parol bilan kiradi. "
+            "JWT token qaytariladi (access + refresh). "
+            "Token'da role, is_staff, username claim'lari bor."
+        ),
+        request=AdminLoginSerializer,
+        responses={
+            200: OpenApiResponse(
+                description="Muvaffaqiyatli login",
+                examples=[OpenApiExample(
+                    name="Success",
+                    value={
+                        "access": "eyJ...",
+                        "refresh": "eyJ...",
+                        "admin": {
+                            "id": 1,
+                            "username": "admin",
+                            "full_name": "Super Admin",
+                            "role": "admin",
+                            "is_staff": True,
+                            "is_superuser": True,
+                        }
+                    }
+                )]
+            ),
+            401: OpenApiResponse(description="Username yoki parol noto'g'ri"),
+            403: OpenApiResponse(description="Admin huquqi yo'q"),
+        },
+        tags=["Admin Auth"],
+    )
+    def post(self, request):
+        serializer = AdminLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        username = serializer.validated_data['username']
+        password = serializer.validated_data['password']
+
+        try:
+            user = CustomUser.objects.get(username=username)
+        except CustomUser.DoesNotExist:
+            _auth_log.warning(f"Admin login: username topilmadi: {username}")
+            return Response(
+                {'error': "Username yoki parol noto'g'ri"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        if not user.check_password(password):
+            _auth_log.warning(f"Admin login: noto'g'ri parol: {username}")
+            return Response(
+                {'error': "Username yoki parol noto'g'ri"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # Faqat admin yoki staff kirishi mumkin
+        if user.role != CustomUser.Role.ADMIN and not user.is_staff:
+            _auth_log.warning(
+                f"Admin login: admin emas: {username}, role={user.role}, is_staff={user.is_staff}"
+            )
+            return Response(
+                {'error': "Sizda admin panel huquqi yo'q"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Custom claim'lar bilan token yaratish
+        tokens = get_tokens_for_user(user)
+
+        _auth_log.info(f"Admin login muvaffaqiyatli: {username}, role={user.role}")
+
+        return Response({
+            **tokens,
+            "admin": AdminUserSerializer(user).data,
+        }, status=status.HTTP_200_OK)
+
+
+class AdminMeView(APIView):
+    """
+    Admin o'z profilini ko'rish.
+    Faqat admin roleiga ruxsat.
+    """
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        summary="Admin profil",
+        description="Autentifikatsiyadan o'tgan admin o'z profilini ko'radi",
+        responses={200: AdminUserSerializer},
+        tags=["Admin Auth"],
+    )
+    def get(self, request):
+        return Response(AdminUserSerializer(request.user).data)
+
+
+class AdminChangePasswordView(APIView):
+    """
+    Admin parolini o'zgartirish.
+    Eski parol talab qilinadi.
+    """
+    permission_classes = [IsAdminUser]
+
+    @extend_schema(
+        summary="Admin parolini o'zgartirish",
+        description=(
+            "Admin o'z parolini o'zgartiradi. "
+            "Eski parol va yangi parol talab qilinadi. "
+            "Muvaffaqiyatli bo'lsa, user logout qilishi va yangi parol bilan login qilishi kerak."
+        ),
+        request=AdminChangePasswordSerializer,
+        responses={
+            200: OpenApiResponse(
+                description="Parol o'zgartirildi",
+                examples=[OpenApiExample(
+                    name="Success",
+                    value={"message": "Parol muvaffaqiyatli o'zgartirildi"}
+                )]
+            ),
+            400: OpenApiResponse(description="Validatsiya xatosi"),
+        },
+        tags=["Admin Auth"],
+    )
+    def post(self, request):
+        serializer = AdminChangePasswordSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+        serializer.is_valid(raise_exception=True)
+        
+        # Yangi parolni o'rnatish
+        user = request.user
+        user.set_password(serializer.validated_data['new_password'])
+        user.save()
+        
+        _auth_log.info(f"Admin parolini o'zgartirdi: {user.username}")
+        
+        return Response({
+            "message": "Parol muvaffaqiyatli o'zgartirildi. Iltimos qaytadan login qiling."
+        }, status=status.HTTP_200_OK)

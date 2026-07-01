@@ -64,8 +64,11 @@ class ArizaKanalNotificationTestCase(TestCase):
         # telegram_kanalga_yubor 1 marta chaqirilganini tekshirish
         self.assertEqual(mock_telegram.call_count, 1)
         
-        # Xabar matnini tekshirish
+        # channel_type='ariza' bilan chaqirilganini tekshirish
         args, kwargs = mock_telegram.call_args
+        self.assertEqual(kwargs.get('channel_type'), 'ariza')
+        
+        # Xabar matnini tekshirish
         xabar = args[0]
         self.assertIn("Yangi ariza tushdi", xabar)
         self.assertIn("Kvartira", xabar)

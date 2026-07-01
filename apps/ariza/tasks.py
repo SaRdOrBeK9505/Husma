@@ -208,9 +208,9 @@ def kanalga_yangi_ariza_xabari_yubor(self, ariza_id: int) -> dict:
             f"📞 Tel: {telefon_str}\n"
         )
         
-        # Kanalga yuborish
+        # Kanalga yuborish - ARIZA kanali
         from core.telegram_utils import telegram_kanalga_yubor
-        yuborildi = telegram_kanalga_yubor(xabar_matni)
+        yuborildi = telegram_kanalga_yubor(xabar_matni, channel_type='ariza')
         
         if yuborildi:
             logger.info(

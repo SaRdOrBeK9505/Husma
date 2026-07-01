@@ -72,9 +72,9 @@ def kanalga_yangi_rieltor_xabari_yubor(self, rieltor_id: int) -> dict:
             f"🗓 Sana: {sana}"
         )
         
-        # Kanalga yuborish
+        # Kanalga yuborish - RIELTOR kanali
         from core.telegram_utils import telegram_kanalga_yubor
-        yuborildi = telegram_kanalga_yubor(xabar_matni)
+        yuborildi = telegram_kanalga_yubor(xabar_matni, channel_type='rieltor')
         
         if yuborildi:
             logger.info(

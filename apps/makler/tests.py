@@ -59,8 +59,11 @@ class RieltorKanalNotificationTestCase(TestCase):
         # telegram_kanalga_yubor 1 marta chaqirilganini tekshirish
         self.assertEqual(mock_telegram.call_count, 1)
         
-        # Xabar matnini tekshirish
+        # channel_type='rieltor' bilan chaqirilganini tekshirish
         args, kwargs = mock_telegram.call_args
+        self.assertEqual(kwargs.get('channel_type'), 'rieltor')
+        
+        # Xabar matnini tekshirish
         xabar = args[0]
         self.assertIn("Yangi rieltor ro'yxatdan o'tdi", xabar)
         self.assertIn("Test Rieltor", xabar)

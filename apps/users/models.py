@@ -45,7 +45,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     phone = models.CharField(max_length=20, blank=True, null=True)
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.USER)
 
-    # Rieltor uchun — username/parol login
+    # Admin uchun — username/parol login (null bo'lishi mumkin, lekin null bo'lmasa unique)
     username = models.CharField(max_length=150, blank=True, null=True)
 
     is_active = models.BooleanField(default=True)
@@ -62,6 +62,15 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     class Meta:
         verbose_name = 'Foydalanuvchi'
         verbose_name_plural = 'Foydalanuvchilar'
+        constraints = [
+            # Username null bo'lishi mumkin (Telegram userlar uchun),
+            # lekin null bo'lmagan username'lar unique bo'lishi shart (Admin uchun)
+            models.UniqueConstraint(
+                fields=['username'],
+                condition=models.Q(username__isnull=False),
+                name='unique_username_when_not_null'
+            )
+        ]
 
     def __str__(self):
         return f"{self.full_name or self.telegram_username or self.telegram_id}"

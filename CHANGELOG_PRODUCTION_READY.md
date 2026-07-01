@@ -5,6 +5,28 @@
 
 ---
 
+## ✨ Yangi Funksiyalar
+
+### Admin Autentifikatsiya Tizimi (2026-07-01)
+**Fayllar:** `apps/users/views.py`, `apps/users/tokens.py`, `apps/users/permissions.py`, `apps/users/serializers.py`
+
+**Qo'shilgan:**
+- `POST /api/admin/auth/login/` — Admin username/parol bilan kirish
+- `GET /api/admin/auth/me/` — Admin profil
+- JWT token'da custom claims: `role`, `is_staff`, `username`
+- Permission classes: `IsAdminUser`, `IsStaffUser`, `IsAdminOrReadOnly`
+- `CustomUser.username` maydoni unique qilindi
+
+**Ishlash tartibi:**
+1. Admin CLI orqali yaratiladi: `python manage.py createsuperuser`
+2. Login qilganda JWT token oladi
+3. Token'da `role='admin'` va `is_staff=True` claim'lari bor
+4. Admin endpointlar `IsAdminUser` permission bilan himoyalangan
+
+**Qo'llanma:** `ADMIN_AUTH_README.md` faylida batafsil
+
+---
+
 ## 🐛 Tuzatilgan Bug'lar
 
 ### 1. Race Condition — Ariza Qabul Qilish (KRITIK)
