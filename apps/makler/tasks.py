@@ -68,7 +68,7 @@ def kanalga_yangi_rieltor_xabari_yubor(self, rieltor_id: int) -> dict:
             f"🆕 *Yangi rieltor ro'yxatdan o'tdi!*\n\n"
             f"👤 Ism: {full_name}\n"
             f"📞 Tel: {telefon}\n"
-            f"📍 Hudud: {hudud_str}\n"
+            f"📌 Hudud: {hudud_str}\n"
             f"🗓 Sana: {sana}"
         )
         

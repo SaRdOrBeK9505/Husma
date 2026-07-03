@@ -122,11 +122,23 @@ def _xabar_matni_tayorla(ariza_makler: ArizaMakler) -> str:
     narx = f"{ariza.narx_min:,} - {ariza.narx_max:,} so'm"
     telefon_str = ariza.telefon or "Ko'rsatilmagan"
     
+    # Ariza turi (maqsad) - ijaraga olish yoki sotib olish
+    ariza_turi = ariza.get_ariza_turi_display()
+    
+    # Xonalar soni
+    xonalar = ariza.get_xonalar_soni_display()
+    
+    # Ism (agar mavjud bo'lsa)
+    ism_qatori = f"👤 Ism: {ariza.ism}\n" if ariza.ism else ""
+    
     matn = (
-        f"🔔 *Yangi ariza kelgan!*\n\n"
+        f"🔔 *Mijozdan yangi ariza tushdi!*\n\n"
+        f"🎯 Maqsad: {ariza_turi}\n"
         f"🏠 Mulk turi: {mulk_turi}\n"
-        f"📍 Hudud: {hudud}\n"
+        f"🛏 Xonalar: {xonalar}\n"
+        f"📌 Hudud: {hudud}\n"
         f"💰 Narx: {narx}\n"
+        f"{ism_qatori}"
         f"📞 Tel: {telefon_str}\n"
     )
     
@@ -200,11 +212,23 @@ def kanalga_yangi_ariza_xabari_yubor(self, ariza_id: int) -> dict:
         narx = f"{ariza.narx_min:,} - {ariza.narx_max:,} so'm"
         telefon_str = ariza.telefon or "Ko'rsatilmagan"
         
+        # Ariza turi (maqsad) - ijaraga olish yoki sotib olish
+        ariza_turi = ariza.get_ariza_turi_display()
+        
+        # Xonalar soni
+        xonalar = ariza.get_xonalar_soni_display()
+        
+        # Ism (agar mavjud bo'lsa)
+        ism_qatori = f"👤 Ism: {ariza.ism}\n" if ariza.ism else ""
+        
         xabar_matni = (
-            f"📋 *Yangi ariza tushdi!*\n\n"
+            f"📋 *Mijozdan yangi ariza tushdi!*\n\n"
+            f"🎯 Maqsad: {ariza_turi}\n"
             f"🏠 Mulk turi: {mulk_turi}\n"
-            f"📍 Hudud: {hudud}\n"
+            f"🛏 Xonalar: {xonalar}\n"
+            f"📌 Hudud: {hudud}\n"
             f"💰 Narx: {narx}\n"
+            f"{ism_qatori}"
             f"📞 Tel: {telefon_str}\n"
         )
         

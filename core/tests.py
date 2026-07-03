@@ -149,7 +149,7 @@ class TelegramUtilsTestCase(TestCase):
         mock_post.return_value = mock_response
         
         # Markdown formatdagi xabar
-        xabar = "🆕 *Yangi ariza*\n\n📍 Hudud: _Chilonzor_"
+        xabar = "🆕 *Yangi ariza*\n\n📌 Hudud: _Chilonzor_"
         result = telegram_kanalga_yubor(xabar, channel_type='ariza')
         
         # Natijalarni tekshirish
