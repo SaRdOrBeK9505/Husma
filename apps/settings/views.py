@@ -223,32 +223,31 @@ class UserStatistikaView(APIView):
         return Response(serializer.data)
 
 
-class UserStatistikaAdminView(APIView):
-    """Admin — statistikani tahrirlash"""
+class UserStatistikaAdminView(generics.RetrieveUpdateAPIView):
+    """Admin — statistikani ko'rish va tahrirlash (singleton)"""
+    serializer_class = UserStatistikaAdminSerializer
     permission_classes = [IsAdminUser]
+
+    def get_object(self):
+        """Singleton obyektni qaytaradi"""
+        return UserStatistika.get()
 
     @extend_schema(
         summary="[Admin] Statistikani ko'rish",
         responses={200: UserStatistikaAdminSerializer},
         tags=["Admin – Settings"],
     )
-    def get(self, request):
-        stat = UserStatistika.get()
-        return Response(UserStatistikaAdminSerializer(stat).data)
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
 
     @extend_schema(
-        summary="[Admin] Statistikani tahrirlash",
+        summary="[Admin] Statistikani qisman yangilash",
         request=UserStatistikaAdminSerializer,
         responses={200: UserStatistikaAdminSerializer},
         tags=["Admin – Settings"],
     )
-    def patch(self, request):
-        stat = UserStatistika.get()
-        serializer = UserStatistikaAdminSerializer(stat, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def patch(self, request, *args, **kwargs):
+        return super().patch(request, *args, **kwargs)
 
     @extend_schema(
         summary="[Admin] Statistikani to'liq yangilash",
@@ -256,13 +255,8 @@ class UserStatistikaAdminView(APIView):
         responses={200: UserStatistikaAdminSerializer},
         tags=["Admin – Settings"],
     )
-    def put(self, request):
-        stat = UserStatistika.get()
-        serializer = UserStatistikaAdminSerializer(stat, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def put(self, request, *args, **kwargs):
+        return super().put(request, *args, **kwargs)
 
 
 # ===== RIELTOR STATISTIKASI (dynamic) =====
@@ -335,32 +329,31 @@ class KontaktView(APIView):
         return Response(serializer.data)
 
 
-class KontaktAdminView(APIView):
-    """Admin paneli — kontaktni tahrirlash"""
+class KontaktAdminView(generics.RetrieveUpdateAPIView):
+    """Admin paneli — kontaktni ko'rish va tahrirlash (singleton)"""
+    serializer_class = KontaktMalumotAdminSerializer
     permission_classes = [IsAdminUser]
+
+    def get_object(self):
+        """Singleton obyektni qaytaradi"""
+        return KontaktMalumot.get()
 
     @extend_schema(
         summary="[Admin] Kontakt ma'lumotlarini ko'rish",
         responses={200: KontaktMalumotAdminSerializer},
         tags=["Admin – Settings"],
     )
-    def get(self, request):
-        kontakt = KontaktMalumot.get()
-        return Response(KontaktMalumotAdminSerializer(kontakt).data)
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
 
     @extend_schema(
-        summary="[Admin] Kontakt ma'lumotlarini tahrirlash",
+        summary="[Admin] Kontakt ma'lumotlarini qisman yangilash",
         request=KontaktMalumotAdminSerializer,
         responses={200: KontaktMalumotAdminSerializer},
         tags=["Admin – Settings"],
     )
-    def patch(self, request):
-        kontakt = KontaktMalumot.get()
-        serializer = KontaktMalumotAdminSerializer(kontakt, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def patch(self, request, *args, **kwargs):
+        return super().patch(request, *args, **kwargs)
 
     @extend_schema(
         summary="[Admin] Kontakt ma'lumotlarini to'liq yangilash",
@@ -368,10 +361,5 @@ class KontaktAdminView(APIView):
         responses={200: KontaktMalumotAdminSerializer},
         tags=["Admin – Settings"],
     )
-    def put(self, request):
-        kontakt = KontaktMalumot.get()
-        serializer = KontaktMalumotAdminSerializer(kontakt, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def put(self, request, *args, **kwargs):
+        return super().put(request, *args, **kwargs)
