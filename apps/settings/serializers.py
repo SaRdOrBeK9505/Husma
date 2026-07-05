@@ -50,11 +50,11 @@ class UserStatistikaSerializer(serializers.ModelSerializer):
 
 
 class UserStatistikaAdminSerializer(serializers.ModelSerializer):
-    """Admin uchun — barcha maydonlarni tahrirlash"""
+    """Admin uchun — bitimlar_soni va javob_vaqti tahrirlash mumkin, rieltorlar_soni read-only"""
     class Meta:
         model = UserStatistika
         fields = ['bitimlar_soni', 'rieltorlar_soni', 'javob_vaqti', 'updated_at']
-        read_only_fields = ['updated_at']
+        read_only_fields = ['rieltorlar_soni', 'updated_at']
 
 
 # ===== RIELTOR STATISTIKA (dynamic) =====

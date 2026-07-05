@@ -195,29 +195,31 @@ class UserStatistikaView(APIView):
     @extend_schema(
         summary="User paneli statistikasi",
         description=(
-            "Statistika: bitimlar_soni, rieltorlar_soni va javob_vaqti "
-            "admin tomonidan kiritilgan."
+            "Statistika: rieltorlar_soni avtomatik hisoblanadi, "
+            "bitimlar_soni va javob_vaqti admin tomonidan kiritiladi."
         ),
         responses={200: UserStatistikaSerializer},
         tags=["Settings"],
     )
     def get(self, request):
-        # from apps.makler.models import MaklerProfil
+        from apps.makler.models import MaklerProfil
 
-        # # Yopilgan (bog'langan) bitimlar soni — ArizaMakler'dan real hisob
-        # bitimlar = ArizaMakler.objects.filter(
-        #     holat=ArizaMakler.Holat.BOGLANDI
-        # ).count()
+        # Tasdiqlangan (bloklangmagan) rieltorlar soni — bazadan avtomatik
+        rieltor_soni = MaklerProfil.objects.filter(
+            verify_holat=MaklerProfil.VerifyHolat.VERIFIED
+        ).count()
 
-        # # Tasdiqlangan (bloklangmagan) rieltorlar soni
-        # rieltor_soni = MaklerProfil.objects.filter(
-        #     verify_holat=MaklerProfil.VerifyHolat.VERIFIED
-        # ).count()
-
-        # Statistika admin nazoratida — singleton modeldan
+        # bitimlar_soni va javob_vaqti admindan olinadi
         stat = UserStatistika.get()
 
-        serializer = UserStatistikaSerializer(stat)
+        # Rieltorlar sonini bazadan override qilamiz
+        data = {
+            'bitimlar_soni': stat.bitimlar_soni,
+            'rieltorlar_soni': rieltor_soni,
+            'javob_vaqti': stat.javob_vaqti,
+        }
+
+        serializer = UserStatistikaSerializer(data)
         return Response(serializer.data)
 
 

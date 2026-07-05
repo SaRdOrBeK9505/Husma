@@ -26,8 +26,8 @@ urlpatterns = [
     path('kontakt/', KontaktView.as_view(), name='kontakt'),
 
     # ===== ADMIN =====
-    # path('admin/statistika/', UserStatistikaAdminView.as_view(), name='admin-user-statistika'),
-    # path('admin/kontakt/', KontaktAdminView.as_view(), name='admin-kontakt'),
-    # path('admin/slider/', SliderAdminListCreateView.as_view(), name='admin-slider-list'),
-    # path('admin/slider/<int:pk>/', SliderAdminDetailView.as_view(), name='admin-slider-detail'),
+    path('admin/statistika/', UserStatistikaAdminView.as_view(), name='admin-user-statistika'),
+    path('admin/kontakt/', KontaktAdminView.as_view(), name='admin-kontakt'),
+    path('admin/slider/', SliderAdminListCreateView.as_view(), name='admin-slider-list'),
+    path('admin/slider/<int:pk>/', SliderAdminDetailView.as_view(), name='admin-slider-detail'),
 ]

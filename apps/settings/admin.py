@@ -76,15 +76,15 @@ class UserStatistikaAdmin(admin.ModelAdmin):
         ("📊 User paneli statistikasi", {
             'fields': ('bitimlar_soni', 'rieltorlar_soni', 'javob_vaqti',),
             'description': (
-                "Bitimlar soni, rieltorlar soni va javob vaqti admin tomonidan kiritiladi. "
-                "Frontendda '500+', '50+', '2s' ko'rinishida chiqadi."
+                "⚠️ DIQQAT: rieltorlar_soni bazadan avtomatik hisoblanadi (faqat ko'rish). "
+                "bitimlar_soni va javob_vaqti hozircha admin tomonidan kiritiladi."
             )
         }),
         ("ℹ️ Ma'lumot", {
             'fields': ('updated_at',),
         }),
     )
-    readonly_fields = ('updated_at',)
+    readonly_fields = ('updated_at', 'rieltorlar_soni')
 
     def has_add_permission(self, request):
         return not UserStatistika.objects.exists()
