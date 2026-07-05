@@ -55,6 +55,14 @@ class UserStatistikaAdminSerializer(serializers.ModelSerializer):
         model = UserStatistika
         fields = ['bitimlar_soni', 'rieltorlar_soni', 'javob_vaqti', 'updated_at']
         read_only_fields = ['rieltorlar_soni', 'updated_at']
+    
+    def validate(self, attrs):
+        # Agar frontend rieltorlar_soni yuborsa, xato qaytarish
+        if 'rieltorlar_soni' in self.initial_data:
+            raise serializers.ValidationError({
+                'rieltorlar_soni': 'Bu maydon tahrirlash uchun emas (avtomatik hisoblanadi).'
+            })
+        return attrs
 
 
 # ===== RIELTOR STATISTIKA (dynamic) =====
