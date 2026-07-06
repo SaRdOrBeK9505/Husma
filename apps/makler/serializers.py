@@ -129,6 +129,63 @@ class RieltorLoginResponseSerializer(serializers.Serializer):
     rieltor = RieltorInfoSerializer()
 
 
+class RieltorObunaHolatiSerializer(serializers.Serializer):
+    """
+    Rieltor obuna holati - Telegram Mini App modal window uchun.
+    
+    Frontend shu ma'lumotlardan foydalanib:
+    1. Rieltor faol/nofaol ekanini biladi
+    2. Qachon obuna tugashini ko'rsatadi
+    3. Modal window'ni kerak bo'lganda ko'rsatadi
+    """
+    faol = serializers.BooleanField(
+        help_text="Rieltor hozir ishlashi mumkinmi (bepul/obuna)"
+    )
+    bloklangan = serializers.BooleanField(
+        help_text="Admin tomonidan bloklanganmi"
+    )
+    
+    # Bepul sinov muddati
+    bepul_muddat_tugash = serializers.DateTimeField(
+        allow_null=True,
+        help_text="Bepul sinov muddati tugash vaqti (7 kun)"
+    )
+    bepul_muddat_qolgan_kunlar = serializers.IntegerField(
+        allow_null=True,
+        help_text="Bepul muddatdan qolgan kunlar soni"
+    )
+    
+    # To'liq obuna ma'lumotlari
+    obuna_faol = serializers.BooleanField(
+        help_text="To'langan obuna faolmi"
+    )
+    obuna_tugash = serializers.DateTimeField(
+        allow_null=True,
+        help_text="Joriy obuna tugash vaqti"
+    )
+    obuna_qolgan_kunlar = serializers.IntegerField(
+        allow_null=True,
+        help_text="Obunadan qolgan kunlar soni"
+    )
+    obuna_tarif_nomi = serializers.CharField(
+        allow_null=True,
+        help_text="Joriy tarif nomi (masalan: 'Oylik obuna')"
+    )
+    
+    # Modal window ko'rsatish uchun
+    modal_korinsin = serializers.BooleanField(
+        help_text="Frontend modal window'ni ko'rsatishi kerakmi"
+    )
+    modal_xabar = serializers.CharField(
+        allow_null=True,
+        help_text="Modal window'da ko'rsatiladigan xabar"
+    )
+    modal_turi = serializers.ChoiceField(
+        choices=['bepul_tugadi', 'obuna_tugadi', 'eslatma', 'bloklangan', 'yoq'],
+        help_text="Modal turi: bepul_tugadi | obuna_tugadi | eslatma | bloklangan | yoq"
+    )
+
+
 # Backward compatibility
 MaklerProfilSerializer = RieltorProfilSerializer
 MaklerProfilUpdateSerializer = RieltorProfilUpdateSerializer

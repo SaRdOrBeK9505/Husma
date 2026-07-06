@@ -56,3 +56,23 @@ def obuna_tugadi_xabar(obuna):
         f"Arizalarni qabul qilishni davom ettirish uchun obunani yangilang."
     )
     return telegram_xabar_yuborish(tg_id, matn)
+
+
+def bepul_muddat_tugadi_xabar(rieltor):
+    """
+    7 kunlik bepul sinov muddati tugaganda rieltorga xabar.
+    
+    Args:
+        rieltor: MaklerProfil instance
+    """
+    tg_id = getattr(rieltor.user, 'telegram_id', None)
+    if not tg_id:
+        return False
+
+    matn = (
+        f"🎁 <b>Bepul sinov muddati tugadi</b>\n\n"
+        f"7 kunlik bepul sinov muddatingiz tugadi. "
+        f"Xizmatdan foydalanishni davom ettirish uchun obuna sotib oling.\n\n"
+        f"💎 Bizning tariflarimiz bilan tanishing va o'zingizga mos tarifni tanlang!"
+    )
+    return telegram_xabar_yuborish(tg_id, matn)

@@ -8,6 +8,7 @@ from django.db import transaction
 from celery import shared_task
 
 from .models import Obuna, Tolov
+from apps.makler.models import MaklerProfil
 
 logger = logging.getLogger(__name__)
 
@@ -130,4 +131,166 @@ def tozalash_eski_kutilayotgan_obunalar():
     return {
         "tozalangan_soni": tozalangan,
         "vaqt": now.isoformat(),
+    }
+
+
+@shared_task
+def obuna_tugash_xabarnomasi():
+    """
+    Muddati tugagan obunalar uchun Telegram xabarnoma yuborish.
+    
+    Ikkita holatni tekshiradi:
+    1. To'liq obunalar (Tarif bo'yicha) - tugash_vaqti o'tgan
+    2. Bepul sinov muddati - bepul_muddat_tugash o'tgan
+    
+    Celery Beat tomonidan kuniga 1 marta (har kuni 10:00 da) ishga tushiriladi.
+    
+    Qaysi obuna/rieltorga xabar yuborilgani `xabarnoma_yuborildi` flagidan
+    kuzatiladi (bu task keyinchalik qo'shiladi - avval logika ishlaydi).
+    """
+    now = timezone.now()
+    
+    # ===== 1. To'liq obunalar tugash xabarnomasi =====
+    # FAOL holatdagi, lekin tugash_vaqti o'tgan obunalarni topish
+    tugagan_obunalar = Obuna.objects.filter(
+        holat=Obuna.Holat.FAOL,
+        tugash_vaqti__lte=now,
+    ).select_related('rieltor__user', 'tarif')
+    
+    obuna_xabar_soni = 0
+    
+    for obuna in tugagan_obunalar:
+        try:
+            # Obuna holatini TUGAGAN ga o'zgartirish
+            with transaction.atomic():
+                obuna.holat = Obuna.Holat.TUGAGAN
+                obuna.save(update_fields=['holat', 'updated_at'])
+            
+            # Telegram xabarnoma yuborish
+            try:
+                from .notifications import obuna_tugadi_xabar
+                if obuna_tugadi_xabar(obuna):
+                    obuna_xabar_soni += 1
+                    logger.info(
+                        "[Obuna Tugash] Xabar yuborildi: obuna_id=%s rieltor=%s tarif=%s",
+                        obuna.id,
+                        obuna.rieltor.user.telegram_id,
+                        obuna.tarif.nomi,
+                    )
+            except Exception as notif_exc:
+                # Xabarnoma xatosi biznes logikani to'xtatmasligi kerak
+                logger.warning(
+                    "[Obuna Tugash] Xabar yuborishda xato: obuna_id=%s err=%s",
+                    obuna.id, notif_exc
+                )
+            
+        except Exception as exc:
+            logger.error(
+                "[Obuna Tugash] Obunani yangilashda xato: obuna_id=%s err=%s",
+                obuna.id, exc, exc_info=True
+            )
+    
+    # ===== 2. Bepul sinov muddati tugash xabarnomasi =====
+    # bepul_muddat_tugash o'tgan, lekin faol obunasi yo'q rieltorlarni topish
+    tugagan_bepul = MaklerProfil.objects.filter(
+        bepul_muddat_tugash__lte=now,
+        bepul_muddat_tugash__isnull=False,
+    ).select_related('user')
+    
+    bepul_xabar_soni = 0
+    
+    for rieltor in tugagan_bepul:
+        try:
+            # Agar rieltorda faol obuna bo'lsa, xabar yubormaymiz
+            if rieltor.obuna_faol:
+                continue
+            
+            # Telegram xabarnoma yuborish
+            try:
+                from .notifications import bepul_muddat_tugadi_xabar
+                if bepul_muddat_tugadi_xabar(rieltor):
+                    bepul_xabar_soni += 1
+                    logger.info(
+                        "[Bepul Muddat Tugash] Xabar yuborildi: rieltor_id=%s telegram_id=%s",
+                        rieltor.id,
+                        rieltor.user.telegram_id,
+                    )
+            except Exception as notif_exc:
+                logger.warning(
+                    "[Bepul Muddat Tugash] Xabar yuborishda xato: rieltor_id=%s err=%s",
+                    rieltor.id, notif_exc
+                )
+            
+        except Exception as exc:
+            logger.error(
+                "[Bepul Muddat Tugash] Rieltorni tekshirishda xato: rieltor_id=%s err=%s",
+                rieltor.id, exc, exc_info=True
+            )
+    
+    logger.info(
+        "[Obuna Tugash Task] Umumiy: obuna xabarlari=%s, bepul muddat xabarlari=%s",
+        obuna_xabar_soni,
+        bepul_xabar_soni,
+    )
+    
+    return {
+        "obuna_xabarnomalar": obuna_xabar_soni,
+        "bepul_muddat_xabarnomalar": bepul_xabar_soni,
+        "tekshirilgan_vaqt": now.isoformat(),
+    }
+
+
+@shared_task
+def obuna_tugashidan_oldin_eslatma(kunlar: int = 3):
+    """
+    Obuna tugashidan {kunlar} kun oldin eslatma xabarnomasi.
+    
+    Args:
+        kunlar: Necha kun oldin xabar yuborish (default: 3)
+    
+    Celery Beat tomonidan kuniga 1 marta (har kuni 09:00 da) ishga tushiriladi.
+    
+    Masalan: Agar obuna 3 kundan keyin tugasa, bugun eslatma xabari yuboriladi.
+    """
+    now = timezone.now()
+    eslatma_vaqt = now + timedelta(days=kunlar)
+    eslatma_vaqt_end = eslatma_vaqt + timedelta(days=1)
+    
+    # Kelgusi {kunlar} kun ichida tugaydigan FAOL obunalarni topish
+    # (Masalan: 3 kun - bugun 10:00, tugash_vaqti 3 kundan 4 kungacha oraliq)
+    tugash_yaqinlashgan = Obuna.objects.filter(
+        holat=Obuna.Holat.FAOL,
+        tugash_vaqti__gte=eslatma_vaqt,
+        tugash_vaqti__lt=eslatma_vaqt_end,
+    ).select_related('rieltor__user', 'tarif')
+    
+    xabar_yuborilgan = 0
+    
+    for obuna in tugash_yaqinlashgan:
+        try:
+            from .notifications import obuna_tugashi_haqida_xabar
+            if obuna_tugashi_haqida_xabar(obuna, qolgan_kun=kunlar):
+                xabar_yuborilgan += 1
+                logger.info(
+                    "[Obuna Eslatma] Xabar yuborildi: obuna_id=%s rieltor=%s qolgan_kun=%s",
+                    obuna.id,
+                    obuna.rieltor.user.telegram_id,
+                    kunlar,
+                )
+        except Exception as exc:
+            logger.warning(
+                "[Obuna Eslatma] Xabar yuborishda xato: obuna_id=%s err=%s",
+                obuna.id, exc
+            )
+    
+    logger.info(
+        "[Obuna Eslatma Task] %s kun oldin eslatma: %s ta xabar yuborildi",
+        kunlar,
+        xabar_yuborilgan,
+    )
+    
+    return {
+        "xabar_yuborilgan": xabar_yuborilgan,
+        "kunlar": kunlar,
+        "tekshirilgan_vaqt": now.isoformat(),
     }

@@ -14,6 +14,7 @@ from .serializers import (
     RieltorProfilUpdateSerializer,
     RieltorLoginSerializer,
     RieltorLoginResponseSerializer,
+    RieltorObunaHolatiSerializer,
 )
 
 
@@ -228,3 +229,179 @@ class AdminStatistikaView(APIView):
             },
         }
         return Response(data)
+
+
+class RieltorObunaHolatiView(APIView):
+    """
+    Rieltor obuna holati — Telegram Mini App modal window uchun.
+    
+    Frontend har safar ochilganda yoki asosiy ekranga qaytganda shu endpoint'ga
+    so'rov yuborib obuna holatini tekshiradi va kerak bo'lsa modal oyna ko'rsatadi.
+    """
+    permission_classes = [IsRieltor]
+
+    @extend_schema(
+        summary="Rieltor obuna holati (Telegram Mini App modal uchun)",
+        description=(
+            "Rieltor obuna holati to'g'risida batafsil ma'lumot qaytaradi.\n\n"
+            "Frontend shu endpoint'dan foydalanib:\n"
+            "- Rieltorning faol/nofaol ekanini biladi\n"
+            "- Qachon obuna tugashini ko'rsatadi\n"
+            "- Kerak bo'lganda modal window ko'rsatadi (masalan: obuna tugagan)\n\n"
+            "**Modal strategiyasi:**\n"
+            "- `modal_korinsin: true` bo'lsa frontend modal window ko'rsatadi\n"
+            "- `modal_turi` modal dizayni va rangini belgilaydi\n"
+            "- `modal_xabar` modal'da ko'rsatiladigan matn\n\n"
+            "**Chaqirish taktikasi:**\n"
+            "- Har safar app ochilganda\n"
+            "- Asosiy ekranga qaytganda\n"
+            "- Ariza ko'rishga urinib ko'rganda (access control)\n"
+        ),
+        responses={
+            200: RieltorObunaHolatiSerializer,
+            403: OpenApiResponse(description="Rieltor profili topilmadi"),
+        },
+        tags=["Rieltor"],
+        examples=[
+            OpenApiExample(
+                name="Faol obuna bor",
+                value={
+                    "faol": True,
+                    "bloklangan": False,
+                    "bepul_muddat_tugash": None,
+                    "bepul_muddat_qolgan_kunlar": None,
+                    "obuna_faol": True,
+                    "obuna_tugash": "2026-08-06T10:00:00Z",
+                    "obuna_qolgan_kunlar": 31,
+                    "obuna_tarif_nomi": "Oylik obuna",
+                    "modal_korinsin": False,
+                    "modal_xabar": None,
+                    "modal_turi": "yoq"
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                name="Obuna tugagan",
+                value={
+                    "faol": False,
+                    "bloklangan": False,
+                    "bepul_muddat_tugash": None,
+                    "bepul_muddat_qolgan_kunlar": None,
+                    "obuna_faol": False,
+                    "obuna_tugash": None,
+                    "obuna_qolgan_kunlar": None,
+                    "obuna_tarif_nomi": None,
+                    "modal_korinsin": True,
+                    "modal_xabar": "Obunangiz muddati tugadi. Xizmatdan foydalanishni davom ettirish uchun obuna sotib oling.",
+                    "modal_turi": "obuna_tugadi"
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                name="Bepul muddat tugashiga yaqin (2 kun qolgan)",
+                value={
+                    "faol": True,
+                    "bloklangan": False,
+                    "bepul_muddat_tugash": "2026-07-08T10:00:00Z",
+                    "bepul_muddat_qolgan_kunlar": 2,
+                    "obuna_faol": False,
+                    "obuna_tugash": None,
+                    "obuna_qolgan_kunlar": None,
+                    "obuna_tarif_nomi": None,
+                    "modal_korinsin": True,
+                    "modal_xabar": "Bepul sinov muddatingiz tugashiga 2 kun qoldi. Uzluksiz xizmatdan foydalanish uchun obuna sotib oling.",
+                    "modal_turi": "eslatma"
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
+    def get(self, request):
+        from datetime import timedelta
+        
+        rieltor = getattr(request.user, 'rieltor_profil', None)
+        if not rieltor:
+            return Response(
+                {"error": "Rieltor profili topilmadi"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        now = timezone.now()
+        
+        # Bepul muddat
+        bepul_muddat_tugash = rieltor.bepul_muddat_tugash
+        bepul_qolgan_kunlar = None
+        if bepul_muddat_tugash and bepul_muddat_tugash > now:
+            bepul_qolgan_kunlar = (bepul_muddat_tugash - now).days
+        
+        # Obuna
+        joriy_obuna = rieltor.obunalar.faol().order_by('-tugash_vaqti').first()
+        obuna_faol = joriy_obuna is not None
+        obuna_tugash = joriy_obuna.tugash_vaqti if joriy_obuna else None
+        obuna_qolgan_kunlar = None
+        obuna_tarif_nomi = None
+        
+        if joriy_obuna:
+            obuna_qolgan_kunlar = (joriy_obuna.tugash_vaqti - now).days
+            obuna_tarif_nomi = joriy_obuna.tarif.nomi
+        
+        # Modal strategiyasi
+        modal_korinsin = False
+        modal_xabar = None
+        modal_turi = "yoq"
+        
+        # 1. Admin bloklagan
+        if rieltor.bloklangan:
+            modal_korinsin = True
+            modal_turi = "bloklangan"
+            modal_xabar = (
+                "Profilingiz admin tomonidan bloklangan. "
+                "Qo'shimcha ma'lumot uchun qo'llab-quvvatlash xizmatiga murojaat qiling."
+            )
+        
+        # 2. Obuna va bepul muddat tugagan
+        elif not rieltor.faol:
+            modal_korinsin = True
+            modal_turi = "obuna_tugadi"
+            modal_xabar = (
+                "Obunangiz muddati tugadi. "
+                "Xizmatdan foydalanishni davom ettirish uchun obuna sotib oling."
+            )
+        
+        # 3. Bepul muddat tugashiga yaqin (3 kun yoki kamroq qolgan)
+        elif bepul_qolgan_kunlar is not None and bepul_qolgan_kunlar <= 3 and not obuna_faol:
+            modal_korinsin = True
+            modal_turi = "eslatma"
+            modal_xabar = (
+                f"Bepul sinov muddatingiz tugashiga {bepul_qolgan_kunlar} kun qoldi. "
+                f"Uzluksiz xizmatdan foydalanish uchun obuna sotib oling."
+            )
+        
+        # 4. Obuna tugashiga yaqin (3 kun yoki kamroq qolgan)
+        elif obuna_qolgan_kunlar is not None and obuna_qolgan_kunlar <= 3:
+            modal_korinsin = True
+            modal_turi = "eslatma"
+            modal_xabar = (
+                f"Obunangiz tugashiga {obuna_qolgan_kunlar} kun qoldi. "
+                f"Uzluksiz xizmatdan foydalanish uchun obunani yangilang."
+            )
+        
+        data = {
+            "faol": rieltor.faol,
+            "bloklangan": rieltor.bloklangan,
+            "bepul_muddat_tugash": bepul_muddat_tugash,
+            "bepul_muddat_qolgan_kunlar": bepul_qolgan_kunlar,
+            "obuna_faol": obuna_faol,
+            "obuna_tugash": obuna_tugash,
+            "obuna_qolgan_kunlar": obuna_qolgan_kunlar,
+            "obuna_tarif_nomi": obuna_tarif_nomi,
+            "modal_korinsin": modal_korinsin,
+            "modal_xabar": modal_xabar,
+            "modal_turi": modal_turi,
+        }
+        
+        serializer = RieltorObunaHolatiSerializer(data)
+        return Response(serializer.data)
