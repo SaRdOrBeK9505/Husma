@@ -12,21 +12,31 @@ def kode_generatsiya():
     return str(random.randint(100000, 999999))
 
 
-def telegram_xabar_yuborish(telegram_id: int, matn: str) -> bool:
+def telegram_xabar_yuborish(telegram_id: int, matn: str, reply_markup: dict = None) -> bool:
     """
     Telegram bot orqali foydalanuvchiga xabar yuboradi.
     True — muvaffaqiyatli, False — xato.
+    
+    Args:
+        telegram_id: Telegram foydalanuvchi IDsi
+        matn: Yuborilishi kerak bo'lgan xabar matni
+        reply_markup: Inline keyboard yoki boshqa markup (optional)
     """
     token = settings.TELEGRAM_BOT_TOKEN
     if not token:
         return False
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = json.dumps({
+    data = {
         "chat_id": telegram_id,
         "text": matn,
         "parse_mode": "HTML",
-    }).encode("utf-8")
+    }
+    
+    if reply_markup:
+        data["reply_markup"] = reply_markup
+    
+    payload = json.dumps(data).encode("utf-8")
 
     req = urllib.request.Request(
         url,

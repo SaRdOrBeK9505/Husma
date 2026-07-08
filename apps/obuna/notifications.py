@@ -5,11 +5,27 @@ Mavjud `apps.users.otp_service.telegram_xabar_yuborish` infratuzilmasidan
 foydalanadi. Xabar yuborilmasa (bot bloklangan va h.k.) jim o'tadi — bu
 biznes-logikani to'xtatmasligi kerak.
 """
+from django.conf import settings
 from apps.users.otp_service import telegram_xabar_yuborish
 
 
 def _telegram_id(obuna) -> int | None:
     return getattr(obuna.rieltor.user, 'telegram_id', None)
+
+
+def _obunalar_tugmasi():
+    """Obunalar sahifasiga o'tish tugmasi."""
+    frontend_url = settings.FRONTEND_URL.rstrip('/')
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "📦 Obunalar sahifasiga o'tish",
+                    "url": f"{frontend_url}/obuna"
+                }
+            ]
+        ]
+    }
 
 
 def obuna_faollashdi_xabar(obuna):
@@ -26,7 +42,7 @@ def obuna_faollashdi_xabar(obuna):
         f"📅 Amal qilish muddati: <b>{tugash}</b> gacha\n\n"
         f"Endi arizalarni qabul qilishingiz mumkin. Omad!"
     )
-    return telegram_xabar_yuborish(tg_id, matn)
+    return telegram_xabar_yuborish(tg_id, matn, reply_markup=_obunalar_tugmasi())
 
 
 def obuna_tugashi_haqida_xabar(obuna, qolgan_kun: int):
@@ -41,7 +57,7 @@ def obuna_tugashi_haqida_xabar(obuna, qolgan_kun: int):
         f"<b>{qolgan_kun} kun</b> qoldi.\n\n"
         f"Uzluksiz ishlash uchun obunani yangilashni unutmang."
     )
-    return telegram_xabar_yuborish(tg_id, matn)
+    return telegram_xabar_yuborish(tg_id, matn, reply_markup=_obunalar_tugmasi())
 
 
 def obuna_tugadi_xabar(obuna):
@@ -55,7 +71,7 @@ def obuna_tugadi_xabar(obuna):
         f"<b>{obuna.tarif.nomi}</b> obunangiz muddati tugadi. "
         f"Arizalarni qabul qilishni davom ettirish uchun obunani yangilang."
     )
-    return telegram_xabar_yuborish(tg_id, matn)
+    return telegram_xabar_yuborish(tg_id, matn, reply_markup=_obunalar_tugmasi())
 
 
 def bepul_muddat_tugadi_xabar(rieltor):
@@ -75,4 +91,4 @@ def bepul_muddat_tugadi_xabar(rieltor):
         f"Xizmatdan foydalanishni davom ettirish uchun obuna sotib oling.\n\n"
         f"💎 Bizning tariflarimiz bilan tanishing va o'zingizga mos tarifni tanlang!"
     )
-    return telegram_xabar_yuborish(tg_id, matn)
+    return telegram_xabar_yuborish(tg_id, matn, reply_markup=_obunalar_tugmasi())
