@@ -17,12 +17,16 @@ def _obunalar_tugmasi():
     """Obunalar sahifasiga o'tish tugmasi."""
     # Telegram xabarlar uchun TELEGRAM_MINI_APP_URL ishlatiladi
     telegram_url = settings.TELEGRAM_MINI_APP_URL.rstrip('/')
+    
+    # MUHIM: "url" emas, "web_app" ishlatish kerak!
+    # "web_app" - Mini App sifatida ochiladi (initData bilan)
+    # "url" - oddiy link (initData yo'q, login so'raydi)
     return {
         "inline_keyboard": [
             [
                 {
                     "text": "📦 Obunalar sahifasiga o'tish",
-                    "url": f"{telegram_url}/obuna"
+                    "web_app": {"url": f"{telegram_url}/obuna"}
                 }
             ]
         ]
