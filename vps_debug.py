@@ -1,8 +1,9 @@
 """
-VPS da debug qilish scripti - nima uchun eski URL ketayotganini topish
+VPS da debug qilish scripti - yangi TELEGRAM_MINI_APP_URL va WEB_APP_URL tekshirish
 
 Bu scriptni VPS da ishga tushiring:
     cd /path/to/Husma
+    source .venv/bin/activate
     python vps_debug.py
 """
 import os
@@ -15,6 +16,9 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
 from django.conf import settings
+
+# Admin telegram ID
+ADMIN_TELEGRAM_ID = 7634681769
 
 
 def check_env_file():
@@ -31,7 +35,6 @@ def check_env_file():
     
     if not os.path.exists(env_path):
         print("❌ .env fayl topilmadi!")
-        print("   Loyiha root direktoriyasida .env yarating")
         return None
     
     env_values = {}
@@ -46,7 +49,7 @@ def check_env_file():
                 key = key.strip()
                 value = value.strip()
                 
-                if key in ['FRONTEND_URL', 'TELEGRAM_BOT_TOKEN', 'DEBUG']:
+                if key in ['TELEGRAM_MINI_APP_URL', 'WEB_APP_URL', 'FRONTEND_URL', 'TELEGRAM_BOT_TOKEN', 'DEBUG']:
                     if key == 'TELEGRAM_BOT_TOKEN':
                         print(f"   {key} = {value[:30]}...")
                     else:
@@ -65,7 +68,9 @@ def check_django_settings():
     
     print("📋 settings.py ga yuklangan qiymatlar:")
     print("-" * 80)
-    print(f"   FRONTEND_URL = '{settings.FRONTEND_URL}'")
+    print(f"   TELEGRAM_MINI_APP_URL = '{settings.TELEGRAM_MINI_APP_URL}'")
+    print(f"   WEB_APP_URL = '{settings.WEB_APP_URL}'")
+    print(f"   FRONTEND_URL = '{settings.FRONTEND_URL}' (eski, backward compatibility)")
     print(f"   DEBUG = {settings.DEBUG}")
     print(f"   TELEGRAM_BOT_TOKEN = {settings.TELEGRAM_BOT_TOKEN[:30]}..." if settings.TELEGRAM_BOT_TOKEN else "   TELEGRAM_BOT_TOKEN = (bo'sh)")
     print()
@@ -74,7 +79,7 @@ def check_django_settings():
 def check_notification_function():
     """notifications.py dan qanday URL yaratilayotganini tekshirish"""
     print("=" * 80)
-    print("🔍 3. NOTIFICATION FUNKSIYASI TEKSHIRUVI")
+    print("🔍 3. NOTIFICATION FUNKSIYASI (Telegram tugma) TEKSHIRUVI")
     print("=" * 80)
     
     try:
@@ -95,20 +100,16 @@ def check_notification_function():
         print()
         
         # Kutilgan URL
-        expected = f"{settings.FRONTEND_URL.rstrip('/')}/obuna" if settings.FRONTEND_URL else "(FRONTEND_URL bo'sh)"
+        expected = f"{settings.TELEGRAM_MINI_APP_URL.rstrip('/')}/obuna" if settings.TELEGRAM_MINI_APP_URL else "(TELEGRAM_MINI_APP_URL bo'sh)"
         
         print(f"🎯 Kutilgan URL: {expected}")
         print(f"📤 Haqiqiy URL:  {tugma_url}")
         print()
         
         if tugma_url == expected:
-            print("✅ TO'G'RI: URL mos keladi!")
+            print("✅ TO'G'RI: Telegram tugma URL to'g'ri yaratilmoqda!")
         else:
             print("❌ XATO: URL'lar mos kelmayapti!")
-            print()
-            print("🔧 MUAMMO TOPILDI:")
-            print("   notifications.py funksiyasi noto'g'ri URL qaytarayapti.")
-            print("   Ehtimol settings.FRONTEND_URL eski qiymatda.")
         
         return tugma_url
         
@@ -120,15 +121,16 @@ def check_notification_function():
 
 
 def test_real_notification():
-    """Real obuna xabarini test qilish"""
+    """Real obuna xabarini test qilish - ADMIN ga yuboriladi"""
     print()
     print("=" * 80)
-    print("🧪 4. REAL XABAR TEST (sizga yuboriladi)")
+    print("🧪 4. REAL TEST XABAR (faqat sizga yuboriladi)")
     print("=" * 80)
     
-    ADMIN_ID = 7634681769
+    print(f"\n📱 Admin Telegram ID: {ADMIN_TELEGRAM_ID}")
+    print("Bu xabar faqat sizga yuboriladi, mijozlarga emas!\n")
     
-    response = input(f"\nSizga (TG ID: {ADMIN_ID}) test xabar yuborishni xohlaysizmi? (ha/yo'q): ").strip().lower()
+    response = input(f"Sizga test xabar yuborishni xohlaysizmi? (ha/yo'q): ").strip().lower()
     
     if response not in ['ha', 'yes', 'y']:
         print("Test o'tkazib yuborildi.")
@@ -139,21 +141,26 @@ def test_real_notification():
         from apps.obuna.notifications import _obunalar_tugmasi
         
         matn = (
-            f"🧪 <b>VPS DEBUG TEST</b>\n\n"
+            f"🧪 <b>VPS DEBUG TEST - Yangi URL tizimi</b>\n\n"
             f"Bu xabar VPS dan yuborildi.\n\n"
-            f"📊 Settings:\n"
-            f"└ FRONTEND_URL: <code>{settings.FRONTEND_URL}</code>\n\n"
+            f"📊 <b>Settings:</b>\n"
+            f"├ TELEGRAM_MINI_APP_URL:\n"
+            f"│  <code>{settings.TELEGRAM_MINI_APP_URL}</code>\n"
+            f"├ WEB_APP_URL:\n"
+            f"│  <code>{settings.WEB_APP_URL}</code>\n"
+            f"└ FRONTEND_URL (eski):\n"
+            f"   <code>{settings.FRONTEND_URL}</code>\n\n"
             f"🔽 Tugmani bosib, to'g'ri sahifaga olib borishini tekshiring!"
         )
         
         tugma = _obunalar_tugmasi()
         
         print("\n📤 Xabar yuborilmoqda...")
-        print(f"   Chat ID: {ADMIN_ID}")
+        print(f"   Chat ID: {ADMIN_TELEGRAM_ID}")
         print(f"   Tugma URL: {tugma['inline_keyboard'][0][0]['url']}")
         print()
         
-        success = telegram_xabar_yuborish(ADMIN_ID, matn, reply_markup=tugma)
+        success = telegram_xabar_yuborish(ADMIN_TELEGRAM_ID, matn, reply_markup=tugma)
         
         if success:
             print("✅ Test xabar muvaffaqiyatli yuborildi!")
@@ -186,27 +193,39 @@ def main():
         print("⚖️  TAQQOSLASH")
         print("=" * 80)
         
+        env_telegram = env_values.get('TELEGRAM_MINI_APP_URL', '')
+        env_web = env_values.get('WEB_APP_URL', '')
         env_frontend = env_values.get('FRONTEND_URL', '')
-        settings_frontend = settings.FRONTEND_URL
         
-        print(f".env fayli:        {env_frontend if env_frontend else '(bo\'sh)'}")
-        print(f"Django settings:   {settings_frontend if settings_frontend else '(bo\'sh)'}")
+        print("📋 .env faylida:")
+        print(f"   TELEGRAM_MINI_APP_URL = {env_telegram if env_telegram else '(bo\'sh)'}")
+        print(f"   WEB_APP_URL = {env_web if env_web else '(bo\'sh)'}")
+        print(f"   FRONTEND_URL = {env_frontend if env_frontend else '(bo\'sh)'}")
         print()
         
-        if env_frontend and settings_frontend:
-            if env_frontend == settings_frontend:
-                print("✅ .env va settings bir xil - YAXSHI!")
+        print("📋 Django settings da:")
+        print(f"   TELEGRAM_MINI_APP_URL = {settings.TELEGRAM_MINI_APP_URL if settings.TELEGRAM_MINI_APP_URL else '(bo\'sh)'}")
+        print(f"   WEB_APP_URL = {settings.WEB_APP_URL if settings.WEB_APP_URL else '(bo\'sh)'}")
+        print(f"   FRONTEND_URL = {settings.FRONTEND_URL if settings.FRONTEND_URL else '(bo\'sh)'}")
+        print()
+        
+        # Telegram URL check
+        if env_telegram and settings.TELEGRAM_MINI_APP_URL:
+            if env_telegram == settings.TELEGRAM_MINI_APP_URL:
+                print("✅ TELEGRAM_MINI_APP_URL: .env va settings bir xil!")
             else:
-                print("❌ MUAMMO TOPILDI: .env va settings turlicha!")
-                print("\n🔧 YECHIM:")
-                print("   1. Servislarni qayta restart qiling:")
-                print("      sudo systemctl restart husma husma-celery husma-celerybeat")
-                print("   2. Agar yordam bermasa, serverni to'liq reboot qiling:")
-                print("      sudo reboot")
-        elif not env_frontend:
-            print("❌ MUAMMO: .env faylida FRONTEND_URL yo'q!")
-        elif not settings_frontend:
-            print("❌ MUAMMO: settings.py ga FRONTEND_URL yuklanmagan!")
+                print("❌ TELEGRAM_MINI_APP_URL: Farq bor - server restart kerak!")
+        elif not env_telegram:
+            print("⚠️  TELEGRAM_MINI_APP_URL .env da yo'q")
+        
+        # Web URL check
+        if env_web and settings.WEB_APP_URL:
+            if env_web == settings.WEB_APP_URL:
+                print("✅ WEB_APP_URL: .env va settings bir xil!")
+            else:
+                print("❌ WEB_APP_URL: Farq bor - server restart kerak!")
+        elif not env_web:
+            print("⚠️  WEB_APP_URL .env da yo'q")
         
         print()
     
@@ -219,32 +238,32 @@ def main():
     # 6. Xulosa
     print()
     print("=" * 80)
-    print("📋 XULOSA VA TAVSIYALAR")
+    print("📋 XULOSA")
     print("=" * 80)
     
-    if settings.FRONTEND_URL:
-        print(f"✅ FRONTEND_URL yuklangan: {settings.FRONTEND_URL}")
-        
-        if notification_url and notification_url.startswith(settings.FRONTEND_URL):
-            print("✅ Notification funksiyasi to'g'ri URL yaratyapti")
-            print()
-            print("🎯 AGAR HALI HAM ESKI URL KETSA:")
-            print("   1. Celery worker loglarini tekshiring:")
-            print("      sudo journalctl -u husma-celery -f")
-            print("   2. Celery worker o'zini qayta yuklagan bo'lishi kerak")
-            print("   3. Agar celery eski kod bilan ishlayotgan bo'lsa:")
-            print("      sudo systemctl stop husma-celery husma-celerybeat")
-            print("      ps aux | grep celery  # hamma celery processlarini to'xtating")
-            print("      sudo systemctl start husma-celery husma-celerybeat")
-        else:
-            print("❌ Notification funksiyasi noto'g'ri URL yaratyapti")
-            print("   Kod qayta yuklanmagan bo'lishi mumkin")
-    else:
-        print("❌ FRONTEND_URL bo'sh yoki yuklanmagan!")
+    if settings.TELEGRAM_MINI_APP_URL and settings.WEB_APP_URL:
+        print(f"✅ TELEGRAM_MINI_APP_URL: {settings.TELEGRAM_MINI_APP_URL}")
+        print(f"✅ WEB_APP_URL: {settings.WEB_APP_URL}")
         print()
-        print("🔧 YECHIM:")
-        print("   1. .env faylida FRONTEND_URL ni to'ldiring")
-        print("   2. Servislarni restart qiling")
+        print("🎯 YANGI URL TIZIMI FAOL!")
+        print("   - Telegram tugmalari → TELEGRAM_MINI_APP_URL")
+        print("   - Multicard return → WEB_APP_URL")
+    elif settings.FRONTEND_URL:
+        print(f"⚠️  ESKI TIZIM: Faqat FRONTEND_URL ishlatilmoqda")
+        print(f"   FRONTEND_URL: {settings.FRONTEND_URL}")
+        print()
+        print("💡 TAVSIYA: Yangi URL tizimiga o'ting:")
+        print("   1. .env ga qo'shing:")
+        print("      TELEGRAM_MINI_APP_URL=https://t.me/husmaestate_bot/husma_estate")
+        print("      WEB_APP_URL=https://husma-tes.vercel.app")
+        print("   2. Restart qiling:")
+        print("      sudo systemctl restart husma husma-celery husma-celerybeat")
+    else:
+        print("❌ HECH QANDAY URL SOZLANMAGAN!")
+        print()
+        print("🔧 .env ga qo'shing:")
+        print("   TELEGRAM_MINI_APP_URL=https://t.me/husmaestate_bot/husma_estate")
+        print("   WEB_APP_URL=https://husma-tes.vercel.app")
     
     print("=" * 80)
     print()
