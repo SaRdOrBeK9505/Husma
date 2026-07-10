@@ -18,6 +18,15 @@ def _obunalar_tugmasi():
     # Telegram xabarlar uchun TELEGRAM_MINI_APP_URL ishlatiladi
     telegram_url = settings.TELEGRAM_MINI_APP_URL.rstrip('/')
     
+    # Agar URL da allaqachon /obuna yoki ?startapp=... bo'lsa, qayta qo'shmaymiz
+    # Aks holda /obuna qo'shamiz
+    if '/obuna' in telegram_url or 'startapp=' in telegram_url:
+        # URL allaqachon to'liq - hech narsa qo'shmaslik kerak
+        final_url = telegram_url
+    else:
+        # Base URL - /obuna qo'shamiz
+        final_url = f"{telegram_url}/obuna"
+    
     # MUHIM: "url" emas, "web_app" ishlatish kerak!
     # "web_app" - Mini App sifatida ochiladi (initData bilan)
     # "url" - oddiy link (initData yo'q, login so'raydi)
@@ -26,7 +35,7 @@ def _obunalar_tugmasi():
             [
                 {
                     "text": "📦 Obunalar sahifasiga o'tish",
-                    "web_app": {"url": f"{telegram_url}/obuna"}
+                    "web_app": {"url": final_url}
                 }
             ]
         ]
