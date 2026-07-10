@@ -43,6 +43,12 @@ initdata_yasash.py
 tekshir_live.py
 tekshir_real.py
 initdata.txt
+fix_old_message_buttons.py
+test_new_button.py
+send_test_to_admin.py
+check_env_settings.py
+edit_message_buttons.py
+find_message_ids.py
 
 # Migrations (optional — bu loyihada saqlab qolish mumkin)
 # apps/*/migrations/0*.py
