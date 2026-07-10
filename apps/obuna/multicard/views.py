@@ -255,12 +255,17 @@ class MulticardReturnView(APIView):
         invoice_id = request.query_params.get("invoice_id", "")
         logger.info("[Multicard Return] invoice_id=%s qaytdi", invoice_id)
 
-        frontend_base = getattr(settings, "FRONTEND_URL", "").rstrip("/")
-        if not frontend_base:
+        # Web app (brauzer) uchun WEB_APP_URL ishlatiladi
+        web_base = getattr(settings, "WEB_APP_URL", "").rstrip("/")
+        if not web_base:
+            # Fallback: eski FRONTEND_URL
+            web_base = getattr(settings, "FRONTEND_URL", "").rstrip("/")
+        
+        if not web_base:
             return Response({
                 "invoice_id": invoice_id,
                 "message": "To'lov natijasi callback orqali qayta ishlanadi.",
             })
 
-        redirect_url = f"{frontend_base}/obuna/natija?invoice_id={invoice_id}"
+        redirect_url = f"{web_base}/obuna/natija?invoice_id={invoice_id}"
         return HttpResponseRedirect(redirect_url)

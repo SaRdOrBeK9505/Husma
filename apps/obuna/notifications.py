@@ -15,13 +15,14 @@ def _telegram_id(obuna) -> int | None:
 
 def _obunalar_tugmasi():
     """Obunalar sahifasiga o'tish tugmasi."""
-    frontend_url = settings.FRONTEND_URL.rstrip('/')
+    # Telegram xabarlar uchun TELEGRAM_MINI_APP_URL ishlatiladi
+    telegram_url = settings.TELEGRAM_MINI_APP_URL.rstrip('/')
     return {
         "inline_keyboard": [
             [
                 {
                     "text": "📦 Obunalar sahifasiga o'tish",
-                    "url": f"{frontend_url}/obuna"
+                    "url": f"{telegram_url}/obuna"
                 }
             ]
         ]

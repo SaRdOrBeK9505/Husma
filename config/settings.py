@@ -271,8 +271,19 @@ MULTICARD_RETURN_URL = os.getenv(
     ''  # .env da to'ldiring
 )
 
-# Frontend bazaviy URL — return view dan redirect uchun
+# Frontend URL'lar
+# TELEGRAM_MINI_APP_URL - Telegram xabar tugmalari uchun (mini app)
+# WEB_APP_URL - Brauzer/web uchun (multicard return va boshqalar)
+TELEGRAM_MINI_APP_URL = os.getenv('TELEGRAM_MINI_APP_URL', '')
+WEB_APP_URL = os.getenv('WEB_APP_URL', '')
+
+# Backward compatibility - eski FRONTEND_URL
+# Agar yangi URL'lar bo'sh bo'lsa, eski FRONTEND_URL ishlatiladi
 FRONTEND_URL = os.getenv('FRONTEND_URL', '')
+if not TELEGRAM_MINI_APP_URL and FRONTEND_URL:
+    TELEGRAM_MINI_APP_URL = FRONTEND_URL
+if not WEB_APP_URL and FRONTEND_URL:
+    WEB_APP_URL = FRONTEND_URL
 
 # HTTP so'rov timeout (sekund)
 MULTICARD_TIMEOUT = int(os.getenv('MULTICARD_TIMEOUT', '15'))
