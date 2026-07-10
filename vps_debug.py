@@ -90,12 +90,24 @@ def check_notification_function():
         
         # Tugma yaratish
         tugma = _obunalar_tugmasi()
-        tugma_url = tugma['inline_keyboard'][0][0]['url']
-        tugma_text = tugma['inline_keyboard'][0][0]['text']
+        tugma_button = tugma['inline_keyboard'][0][0]
+        tugma_text = tugma_button['text']
+        
+        # web_app yoki url ni olish
+        if 'web_app' in tugma_button:
+            tugma_url = tugma_button['web_app']['url']
+            tugma_turi = "Mini App (web_app) ✅"
+        elif 'url' in tugma_button:
+            tugma_url = tugma_button['url']
+            tugma_turi = "Oddiy link (url) ⚠️"
+        else:
+            tugma_url = "Unknown"
+            tugma_turi = "Noma'lum ❌"
         
         print("📦 _obunalar_tugmasi() funksiyasi qaytargan qiymat:")
         print("-" * 80)
         print(f"   Tugma matni: {tugma_text}")
+        print(f"   Tugma turi: {tugma_turi}")
         print(f"   Tugma URL: {tugma_url}")
         print()
         
@@ -157,7 +169,19 @@ def test_real_notification():
         
         print("\n📤 Xabar yuborilmoqda...")
         print(f"   Chat ID: {ADMIN_TELEGRAM_ID}")
-        print(f"   Tugma URL: {tugma['inline_keyboard'][0][0]['url']}")
+        
+        # web_app yoki url ni olish
+        button_data = tugma['inline_keyboard'][0][0]
+        if 'web_app' in button_data:
+            button_url = button_data['web_app']['url']
+            print(f"   Tugma turi: Mini App (web_app)")
+        elif 'url' in button_data:
+            button_url = button_data['url']
+            print(f"   Tugma turi: Oddiy link (url)")
+        else:
+            button_url = "Unknown"
+        
+        print(f"   Tugma URL: {button_url}")
         print()
         
         success = telegram_xabar_yuborish(ADMIN_TELEGRAM_ID, matn, reply_markup=tugma)
