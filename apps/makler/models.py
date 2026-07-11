@@ -62,6 +62,17 @@ class MaklerProfil(models.Model):
         help_text="Bepul sinov muddati tugash vaqti (ro'yxatdan o'tgandan 7 kun)"
     )
 
+    # 14 kunlik qo'shimcha bepul sinov aksiyasi uchun idempotency bayrog'i.
+    # True bo'lsa — bu rieltorga aksiya allaqachon berilgan, qayta berilmaydi.
+    qoshimcha_bepul_muddat_berildi = models.BooleanField(
+        default=False,
+        help_text="14 kunlik qo'shimcha bepul sinov muddati aksiyasi berilganmi"
+    )
+    qoshimcha_bepul_muddat_vaqti = models.DateTimeField(
+        blank=True, null=True,
+        help_text="14 kunlik aksiya qachon berilgani (audit uchun)"
+    )
+
     ortacha_reyting = models.DecimalField(
         max_digits=3,
         decimal_places=2,

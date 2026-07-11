@@ -106,3 +106,33 @@ def bepul_muddat_tugadi_xabar(rieltor):
         f"💎 Bizning tariflarimiz bilan tanishing va o'zingizga mos tarifni tanlang!"
     )
     return telegram_xabar_yuborish(tg_id, matn, reply_markup=_obunalar_tugmasi())
+
+
+def qoshimcha_bepul_muddat_tabrik_xabar(rieltor, kun: int):
+    """
+    14 kunlik qo'shimcha bepul sinov muddati berilganda rieltorga tabrik xabari.
+
+    Args:
+        rieltor: MaklerProfil instance
+        kun: Berilgan qo'shimcha kunlar soni (masalan 14)
+
+    Returns:
+        bool: xabar yuborilgan bo'lsa True, aks holda False
+    """
+    tg_id = getattr(rieltor.user, 'telegram_id', None)
+    if not tg_id:
+        return False
+
+    tugash = (
+        rieltor.bepul_muddat_tugash.strftime('%d.%m.%Y')
+        if rieltor.bepul_muddat_tugash else '-'
+    )
+    matn = (
+        f"🎉 <b>Sizga sovg'a bor!</b>\n\n"
+        f"Hurmatli hamkorimiz, sizga qo'shimcha "
+        f"<b>{kun} kunlik BEPUL</b> foydalanish muddati taqdim etildi! 🎁\n\n"
+        f"📅 Yangi muddat: <b>{tugash}</b> gacha amal qiladi.\n\n"
+        f"Ushbu muddat ichida barcha imkoniyatlardan bemalol "
+        f"foydalanishingiz mumkin. Omad tilaymiz! 🚀"
+    )
+    return telegram_xabar_yuborish(tg_id, matn, reply_markup=_obunalar_tugmasi())
