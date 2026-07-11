@@ -1,15 +1,76 @@
 from django.contrib import admin
+from django.utils import timezone
 from .models import MaklerProfil
+
+
+class ObunaHolatFilter(admin.SimpleListFilter):
+    """
+    Rieltorlarni obuna/muddat holati bo'yicha filtrlash.
+
+    Variantlar:
+      - faol_obuna       : hozir to'langan (faol) obunasi bor
+      - bepul_muddat     : bepul sinov muddati ichida (hali tugamagan)
+      - qoshimcha_bepul  : 14 kunlik qo'shimcha aksiya berilgan
+      - muddat_tugagan   : ishlash huquqi yo'q (bepul ham, obuna ham yo'q)
+    """
+    title = "Obuna / muddat holati"
+    parameter_name = 'obuna_holat'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('faol_obuna', 'Faol obunasi bor'),
+            ('bepul_muddat', 'Bepul sinov muddati ichida'),
+            ('qoshimcha_bepul', '14 kunlik aksiya berilgan'),
+            ('muddat_tugagan', 'Muddati tugagan (huquqi yo\'q)'),
+        )
+
+    def queryset(self, request, queryset):
+        from apps.obuna.models import Obuna
+        now = timezone.now()
+
+        faol_obuna_idlari = Obuna.objects.filter(
+            holat=Obuna.Holat.FAOL,
+            tugash_vaqti__gt=now,
+        ).values_list('rieltor_id', flat=True)
+
+        val = self.value()
+
+        if val == 'faol_obuna':
+            return queryset.filter(id__in=list(faol_obuna_idlari))
+
+        if val == 'bepul_muddat':
+            return queryset.filter(
+                bepul_muddat_tugash__gt=now,
+                bepul_muddat_tugash__isnull=False,
+            )
+
+        if val == 'qoshimcha_bepul':
+            return queryset.filter(qoshimcha_bepul_muddat_berildi=True)
+
+        if val == 'muddat_tugagan':
+            # Bepul muddati tugagan YOKI yo'q, VA faol obunasi yo'q
+            return queryset.exclude(
+                bepul_muddat_tugash__gt=now,
+            ).exclude(
+                id__in=list(faol_obuna_idlari),
+            )
+
+        return queryset
 
 
 @admin.register(MaklerProfil)
 class RieltorProfilAdmin(admin.ModelAdmin):
     list_display = [
         'user', 'username_display', 'verify_holat', 'faol',
-        'bepul_muddat_tugash', 'obuna_faol_display', 'obuna_tugash',
+        'bepul_muddat_tugash', 'qoshimcha_bepul_muddat_berildi',
+        'obuna_faol_display', 'obuna_tugash',
         'ortacha_reyting', 'jami_bitimlar', 'created_at',
     ]
-    list_filter = ['verify_holat']
+    list_filter = [
+        'verify_holat',
+        ObunaHolatFilter,
+        'qoshimcha_bepul_muddat_berildi',
+    ]
     search_fields = [
         'user__full_name', 'user__telegram_username',
         'user__username', 'user__phone',
@@ -18,6 +79,7 @@ class RieltorProfilAdmin(admin.ModelAdmin):
     readonly_fields = [
         'ortacha_reyting', 'jami_bitimlar', 'verify_qilingan_vaqt',
         'faol', 'obuna_faol_display', 'obuna_tugash', 'login_malumotlari',
+        'qoshimcha_bepul_muddat_vaqti',
     ]
 
     fieldsets = (
@@ -33,10 +95,16 @@ class RieltorProfilAdmin(admin.ModelAdmin):
             ),
         }),
         ('Sinov va Obuna', {
-            'fields': ('bepul_muddat_tugash', 'faol', 'obuna_faol_display', 'obuna_tugash'),
+            'fields': (
+                'bepul_muddat_tugash', 'faol',
+                'qoshimcha_bepul_muddat_berildi', 'qoshimcha_bepul_muddat_vaqti',
+                'obuna_faol_display', 'obuna_tugash',
+            ),
             'description': (
                 "Obuna ma'lumotlari 'Obuna' bo'limidan boshqariladi. "
-                "Bu yerda faqat hisoblangan holat ko'rsatiladi."
+                "Bu yerda faqat hisoblangan holat ko'rsatiladi. "
+                "'14 kunlik aksiya berildi' — qo'shimcha bepul muddat aksiyasi "
+                "berilgan-berilmaganini bildiradi (idempotency uchun)."
             ),
         }),
     )

@@ -135,4 +135,4 @@ def qoshimcha_bepul_muddat_tabrik_xabar(rieltor, kun: int):
         f"Ushbu muddat ichida barcha imkoniyatlardan bemalol "
         f"foydalanishingiz mumkin. Omad tilaymiz! 🚀"
     )
-    return telegram_xabar_yuborish(tg_id, matn, reply_markup=_obunalar_tugmasi())
+    return telegram_xabar_yuborish(tg_id, matn)
