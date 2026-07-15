@@ -37,6 +37,7 @@ def yangi_ariza_xabari_yubor(self, ariza_makler_id: int) -> dict:
         # ArizaMaklerni olish
         ariza_makler = ArizaMakler.objects.select_related(
             'rieltor__user',
+            'ariza__user',
             'ariza__mulk_turi',
             'ariza__hudud'
         ).get(id=ariza_makler_id)
@@ -66,8 +67,11 @@ def yangi_ariza_xabari_yubor(self, ariza_makler_id: int) -> dict:
         # Xabar matnini tayyorlash
         xabar_matni = _xabar_matni_tayorla(ariza_makler)
         
+        # Mijoz bilan Telegram orqali bog'lanish tugmasi
+        reply_markup = _bogla_tugma(ariza_makler.ariza.user)
+        
         # Telegram API orqali yuborish
-        _telegram_yubor(telegram_id, xabar_matni)
+        _telegram_yubor(telegram_id, xabar_matni, reply_markup=reply_markup)
         
         # Muvaffaqiyatli yuborilgandan keyin holatni yangilash
         ariza_makler.holat = ArizaMakler.Holat.KORILDI
@@ -114,13 +118,72 @@ def yangi_ariza_xabari_yubor(self, ariza_makler_id: int) -> dict:
         }
 
 
+def _telefon_tozala(telefon: str) -> str:
+    """
+    Telefon raqamni Telegram avtomatik aniqlaydigan (dialer ochiladigan)
+    xalqaro formatga keltiradi: faqat '+' va raqamlar.
+
+    Masalan: "+998 (93) 577-15-07" -> "+998935771507"
+    """
+    if not telefon:
+        return ""
+    raqamlar = "".join(ch for ch in telefon if ch.isdigit())
+    if not raqamlar:
+        return ""
+    return f"+{raqamlar}"
+
+
+def _telegram_bogla_url(user) -> str:
+    """
+    Mijoz bilan Telegram orqali bog'lanish uchun URL qaytaradi.
+
+    - Agar telegram_username bo'lsa -> https://t.me/<username>
+    - Aks holda telegram_id orqali -> tg://user?id=<telegram_id>
+    - Ikkalasi ham bo'lmasa -> bo'sh string
+    """
+    if user is None:
+        return ""
+
+    username = (getattr(user, 'telegram_username', '') or '').lstrip('@').strip()
+    if username:
+        return f"https://t.me/{username}"
+
+    telegram_id = getattr(user, 'telegram_id', None)
+    if telegram_id:
+        return f"tg://user?id={telegram_id}"
+
+    return ""
+
+
+def _bogla_tugma(user) -> dict | None:
+    """
+    Mijoz bilan Telegram orqali bog'lanish uchun inline tugma (reply_markup)
+    yasaydi. Agar bog'lanish uchun ma'lumot bo'lmasa None qaytaradi.
+    """
+    url = _telegram_bogla_url(user)
+    if not url:
+        return None
+
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "✈️ Telegram orqali bog'lanish",
+                    "url": url,
+                }
+            ]
+        ]
+    }
+
+
 def _xabar_matni_tayorla(ariza_makler: ArizaMakler) -> str:
     """Xabar matnini tayyorlaydi."""
     ariza = ariza_makler.ariza
     mulk_turi = ariza.mulk_turi.nomi if ariza.mulk_turi else "Noma'lum"
     hudud = ariza.hudud.nomi if ariza.hudud else "Noma'lum"
     narx = f"{ariza.narx_min:,} - {ariza.narx_max:,} so'm"
-    telefon_str = ariza.telefon or "Ko'rsatilmagan"
+    # Telefonni dialer ochiladigan toza formatda ko'rsatamiz
+    telefon_str = _telefon_tozala(ariza.telefon) or "Ko'rsatilmagan"
     
     # Ariza turi (maqsad) - ijaraga olish yoki sotib olish
     ariza_turi = ariza.get_ariza_turi_display()
@@ -145,8 +208,14 @@ def _xabar_matni_tayorla(ariza_makler: ArizaMakler) -> str:
     return matn
 
 
-def _telegram_yubor(chat_id: str, text: str) -> None:
-    """Telegram Bot API orqali xabar yuboradi."""
+def _telegram_yubor(chat_id: str, text: str, reply_markup: dict | None = None) -> None:
+    """Telegram Bot API orqali xabar yuboradi.
+
+    Args:
+        chat_id: Qabul qiluvchi chat/telegram ID
+        text: Xabar matni (Markdown)
+        reply_markup: (ixtiyoriy) inline tugmalar uchun markup
+    """
     bot_token = getattr(settings, 'TELEGRAM_BOT_TOKEN', '')
     if not bot_token:
         raise ValueError("TELEGRAM_BOT_TOKEN sozlanmagan")
@@ -159,6 +228,8 @@ def _telegram_yubor(chat_id: str, text: str) -> None:
         'text': text,
         'parse_mode': 'Markdown'
     }
+    if reply_markup:
+        payload['reply_markup'] = reply_markup
     
     response = requests.post(url, json=payload, timeout=10)
     response.raise_for_status()
@@ -210,7 +281,7 @@ def kanalga_yangi_ariza_xabari_yubor(self, ariza_id: int) -> dict:
         mulk_turi = ariza.mulk_turi.nomi if ariza.mulk_turi else "Noma'lum"
         hudud = ariza.hudud.nomi if ariza.hudud else "Noma'lum"
         narx = f"{ariza.narx_min:,} - {ariza.narx_max:,} so'm"
-        telefon_str = ariza.telefon or "Ko'rsatilmagan"
+        telefon_str = _telefon_tozala(ariza.telefon) or "Ko'rsatilmagan"
         
         # Ariza turi (maqsad) - ijaraga olish yoki sotib olish
         ariza_turi = ariza.get_ariza_turi_display()
