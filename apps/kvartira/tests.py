@@ -480,10 +480,25 @@ class KvartiraValidationTests(KvartiraBaseTestCase):
         kv = Kvartira.objects.get(pk=resp.data['id'])
         self.assertEqual(kv.qoshgan_id, self.rieltor_a.id)
 
-    def test_is_verified_readonly(self):
-        """is_verified foydalanuvchi tomonidan o'rnatib bo'lmaydi (moderatsiya admin ishi)."""
+    def test_new_kvartira_auto_verified(self):
+        """VAQTINCHALIK: moderatsiya o'chirilgan — yangi kvartira darhol
+        is_verified=True bo'ladi va userlarga ko'rinadi.
+
+        KEYINCHALIK moderatsiya qaytarilsa, bu test
+        `assertFalse(kv.is_verified)` ga o'zgartirilishi kerak.
+        """
         self.auth(self.rieltor_a)
         resp = self.client.post(self.url, self.valid_payload(), format='json')
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         kv = Kvartira.objects.get(pk=resp.data['id'])
-        self.assertFalse(kv.is_verified, msg="Yangi kvartira avtomatik verified bo'lib qoldi!")
+        self.assertTrue(kv.is_verified, msg="Yangi kvartira avtomatik tasdiqlanmadi!")
+
+    def test_is_verified_not_client_controlled(self):
+        """Rieltor is_verified=False yuborsa ham, u e'tiborsiz qoldiriladi
+        (maydon read-only; qiymatni faqat server/admin belgilaydi)."""
+        self.auth(self.rieltor_a)
+        resp = self.client.post(self.url, self.valid_payload(is_verified=False), format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        kv = Kvartira.objects.get(pk=resp.data['id'])
+        # Client yuborgan False e'tiborsiz qoldirilib, server True qo'ygan
+        self.assertTrue(kv.is_verified)

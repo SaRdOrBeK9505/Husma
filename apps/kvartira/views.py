@@ -137,6 +137,14 @@ class RieltorKvartiraListCreateView(ListCreateAPIView):
         save_kwargs = {'qoshgan': request.user, 'telegram_id': tg['telegram_id']}
         if not serializer.validated_data.get('telegram_username') and tg['telegram_username']:
             save_kwargs['telegram_username'] = tg['telegram_username']
+
+        # --- VAQTINCHALIK: admin moderatsiyasi o'chirilgan ---
+        # Hozircha rieltor qo'shgan kvartira darhol tasdiqlangan (is_verified=True)
+        # holatda yaratiladi va userlarga to'g'ridan-to'g'ri ko'rinadi.
+        # KEYINCHALIK moderatsiya qaytarilganda — shu qatorni o'chirish kifoya
+        # (default is_verified=False bo'lgani uchun admin qo'lda tasdiqlaydi).
+        save_kwargs['is_verified'] = True
+
         kvartira = serializer.save(**save_kwargs)
         return Response(
             KvartiraSerializer(kvartira).data,
