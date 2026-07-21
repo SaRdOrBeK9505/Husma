@@ -12,6 +12,7 @@ from drf_spectacular.types import OpenApiTypes
 from rest_framework import serializers as drf_serializers
 
 from core.permissions import IsUser, IsVerifiedRieltor, IsAdmin, IsUserOrRieltor
+from core.pagination import ArizaPagination
 from .models import Ariza, ArizaMakler
 from .serializers import ArizaYaratishSerializer, ArizaSerializer, MaklerArizaSerializer
 from .services import arizani_maklerlarga_yuborish
@@ -56,6 +57,7 @@ class ArizaYaratishView(CreateAPIView):
 class UserArizalarView(ListAPIView):
     permission_classes = [IsUserOrRieltor]
     serializer_class = ArizaSerializer
+    pagination_class = ArizaPagination
     queryset = Ariza.objects.none()
 
     @extend_schema(
@@ -68,18 +70,21 @@ class UserArizalarView(ListAPIView):
                 description="Holat bo'yicha filter: yangi | korilmoqda | yopilgan",
                 required=False,
                 enum=['yangi', 'korilmoqda', 'yopilgan'],
-            )
+            ),
+            OpenApiParameter(
+                name='page', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+                description="Sahifa raqami", required=False,
+            ),
+            OpenApiParameter(
+                name='page_size', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+                description="Sahifadagi elementlar soni (max 100)", required=False,
+            ),
         ],
         responses={200: ArizaSerializer(many=True)},
         tags=["Ariza"],
     )
     def get(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return Response({
-            'jami_soni': queryset.count(),
-            'arizalar': serializer.data,
-        })
+        return super().get(request, *args, **kwargs)
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
@@ -171,6 +176,7 @@ class UserArizaDetailView(RetrieveUpdateDestroyAPIView):
 class RieltorArizalarView(ListAPIView):
     permission_classes = [IsVerifiedRieltor]
     serializer_class = MaklerArizaSerializer
+    pagination_class = ArizaPagination
     queryset = Ariza.objects.none()
 
     @extend_schema(
@@ -183,18 +189,21 @@ class RieltorArizalarView(ListAPIView):
                 description="Holat bo'yicha filter: yangi | korilmoqda | yopilgan",
                 required=False,
                 enum=['yangi', 'korilmoqda', 'yopilgan'],
-            )
+            ),
+            OpenApiParameter(
+                name='page', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+                description="Sahifa raqami", required=False,
+            ),
+            OpenApiParameter(
+                name='page_size', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
+                description="Sahifadagi elementlar soni (max 100)", required=False,
+            ),
         ],
         responses={200: MaklerArizaSerializer(many=True)},
         tags=["Rieltor"],
     )
     def get(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return Response({
-            'jami_soni': queryset.count(),
-            'arizalar': serializer.data,
-        })
+        return super().get(request, *args, **kwargs)
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):

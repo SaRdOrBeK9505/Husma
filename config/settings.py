@@ -299,6 +299,48 @@ CELERY_TIMEZONE = 'Asia/Tashkent'
 # Davriy vazifalarni yoqish (Celery Beat)
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
+# --- DigitalOcean Spaces (media fayllar uchun) ---
+DO_SPACES_ACCESS_KEY = os.getenv('DO_SPACES_ACCESS_KEY')
+DO_SPACES_SECRET_KEY = os.getenv('DO_SPACES_SECRET_KEY')
+
+if not DO_SPACES_ACCESS_KEY or not DO_SPACES_SECRET_KEY:
+    raise RuntimeError("DO_SPACES kalitlari .env faylida topilmadi. Iltimos tekshiring.")
+
+INSTALLED_APPS += ['storages']
+
+AWS_ACCESS_KEY_ID = DO_SPACES_ACCESS_KEY
+AWS_SECRET_ACCESS_KEY = DO_SPACES_SECRET_KEY
+AWS_STORAGE_BUCKET_NAME = os.getenv('DO_SPACES_BUCKET_NAME')
+AWS_S3_ENDPOINT_URL = os.getenv('DO_SPACES_ENDPOINT_URL')
+AWS_S3_REGION_NAME = os.getenv('DO_SPACES_REGION')
+AWS_DEFAULT_ACL = 'public-read'
+AWS_S3_OBJECT_PARAMETERS = {
+    'CacheControl': 'max-age=2592000',
+}
+AWS_S3_FILE_OVERWRITE = False
+AWS_LOCATION = 'media'
+
+# MUHIM: Fayl URL'lari DigitalOcean CDN (edge) domeni orqali berilishi kerak.
+# Custom domain sozlanmasa, django-storages origin manzilni beradi
+# (https://fra1.digitaloceanspaces.com/husma-media/...) — bu CDN keshidan
+# foydalanmaydi. Custom domain bilan URL:
+#   https://husma-media.fra1.cdn.digitaloceanspaces.com/media/...
+AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.{AWS_S3_REGION_NAME}.cdn.digitaloceanspaces.com'
+
+# Django 5.1+/6.0 uslubi. Eskirgan DEFAULT_FILE_STORAGE o'rniga STORAGES ishlatiladi.
+STORAGES = {
+    'default': {
+        'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+    },
+    'staticfiles': {
+        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+    },
+}
+
+# Media fayllar (rasmlar) — CDN orqali beriladi.
+MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
+
+
 LANGUAGE_CODE = 'uz'
 TIME_ZONE = 'Asia/Tashkent'
 USE_I18N = True
@@ -307,8 +349,10 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# DIQQAT: MEDIA_URL yuqorida DigitalOcean CDN domeni bilan sozlangan.
+# Bu yerda uni QAYTA e'lon qilmaymiz — aks holda CDN manzil '/media/' bilan
+# almashib, rasm URL'lari buziladi. MEDIA_ROOT ham kerak emas, chunki fayllar
+# lokal diskda emas, DigitalOcean Spaces (S3) da saqlanadi.
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

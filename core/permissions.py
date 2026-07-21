@@ -1,4 +1,4 @@
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 
 class IsAdmin(BasePermission):
@@ -67,6 +67,65 @@ class IsUserOrRieltor(BasePermission):
             request.user.is_authenticated
             and request.user.role in ['user', 'makler']
         )
+
+
+class IsAdminOrActiveRieltor(BasePermission):
+    """
+    Kvartira (va shunga o'xshash) resurslarni BOSHQARISH uchun ruxsat.
+
+    Mantiq:
+    - Admin — har doim ruxsat (moderatsiya/qo'llab-quvvatlash uchun).
+    - Rieltor (makler):
+        * O'qish (GET/HEAD/OPTIONS) — role='makler' bo'lishi kifoya
+          (o'z e'lonlari ro'yxatini ko'ra oladi).
+        * Yozish (POST/PUT/PATCH/DELETE) — QO'SHIMCHA ravishda rieltor
+          profili "faol" bo'lishi shart:
+            - Admin bloklamagan (verify_holat != rejected), VA
+            - Bepul sinov muddati ichida YOKI faol obunasi bor.
+    - Boshqa rollar — rad etiladi.
+
+    Bu sinf `IsAdminOrRieltor` o'rnini bosadi va bloklangan / muddati tugagan
+    rieltorlarning yangi e'lon qo'shishi yoki tahrirlashini to'sadi.
+    """
+    message = 'Faqat admin yoki faol rieltorlar uchun.'
+
+    # Rieltor faol emasligining aniq sabablari uchun xabarlar
+    MSG_BLOCKED = 'Profilingiz admin tomonidan bloklangan. Qo\'llab-quvvatlashga murojaat qiling.'
+    MSG_INACTIVE = 'Bepul sinov muddati tugagan yoki faol obunangiz yo\'q. Obuna oling.'
+    MSG_NO_PROFILE = 'Rieltor profili topilmadi.'
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
+
+        # Admin — cheklovsiz
+        if user.role == 'admin':
+            return True
+
+        # Faqat rieltorlar davom etadi
+        if user.role != 'makler':
+            return False
+
+        # O'qish amallari — role kifoya (queryset baribir o'z e'lonlari bilan cheklangan)
+        if request.method in SAFE_METHODS:
+            return True
+
+        # Yozish amallari — rieltor "faol" bo'lishi shart
+        profil = getattr(user, 'rieltor_profil', None)
+        if profil is None:
+            self.message = self.MSG_NO_PROFILE
+            return False
+
+        if profil.bloklangan:
+            self.message = self.MSG_BLOCKED
+            return False
+
+        if not profil.faol:
+            self.message = self.MSG_INACTIVE
+            return False
+
+        return True
 
 
 # Backward compatibility uchun alias'lar
