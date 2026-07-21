@@ -195,7 +195,8 @@ class UserStatistikaView(APIView):
     @extend_schema(
         summary="User paneli statistikasi",
         description=(
-            "Statistika: rieltorlar_soni avtomatik hisoblanadi, "
+            "Statistika: rieltorlar_soni bazadan avtomatik hisoblanadi "
+            "(barcha rieltor profillari soni), "
             "bitimlar_soni va javob_vaqti admin tomonidan kiritiladi."
         ),
         responses={200: UserStatistikaSerializer},
@@ -204,10 +205,8 @@ class UserStatistikaView(APIView):
     def get(self, request):
         from apps.makler.models import MaklerProfil
 
-        # Tasdiqlangan (bloklangmagan) rieltorlar soni — bazadan avtomatik
-        rieltor_soni = MaklerProfil.objects.filter(
-            verify_holat=MaklerProfil.VerifyHolat.VERIFIED
-        ).count()
+        # Barcha rieltor profillari soni — holatidan qat'i nazar (bazadan avtomatik)
+        rieltor_soni = MaklerProfil.objects.count()
 
         # bitimlar_soni va javob_vaqti admindan olinadi
         stat = UserStatistika.get()

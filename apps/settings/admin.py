@@ -74,17 +74,27 @@ class KontaktMalumotAdmin(admin.ModelAdmin):
 class UserStatistikaAdmin(admin.ModelAdmin):
     fieldsets = (
         ("📊 User paneli statistikasi", {
-            'fields': ('bitimlar_soni', 'rieltorlar_soni', 'javob_vaqti',),
+            'fields': ('bitimlar_soni', 'rieltorlar_soni_jonli', 'javob_vaqti',),
             'description': (
-                "⚠️ DIQQAT: rieltorlar_soni bazadan avtomatik hisoblanadi (faqat ko'rish). "
-                "bitimlar_soni va javob_vaqti hozircha admin tomonidan kiritiladi."
+                "⚠️ DIQQAT: 'Rieltorlar soni (jonli)' bazadan real-time hisoblanadi "
+                "(barcha rieltor profillari). Bu qiymat saqlanmaydi — har safar bazadan "
+                "sanaladi. bitimlar_soni va javob_vaqti admin tomonidan kiritiladi."
             )
         }),
         ("ℹ️ Ma'lumot", {
             'fields': ('updated_at',),
         }),
     )
-    readonly_fields = ('updated_at', 'rieltorlar_soni')
+    readonly_fields = ('updated_at', 'rieltorlar_soni_jonli')
+
+    @admin.display(description="Rieltorlar soni (jonli — bazadan)")
+    def rieltorlar_soni_jonli(self, obj=None):
+        """
+        Barcha rieltor profillari sonini bazadan real-time sanaydi
+        (holatidan qat'i nazar). API (/api/statistika/) bilan bir xil mantiq.
+        """
+        from apps.makler.models import MaklerProfil
+        return MaklerProfil.objects.count()
 
     def has_add_permission(self, request):
         return not UserStatistika.objects.exists()
