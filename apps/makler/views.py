@@ -132,31 +132,42 @@ class AdminRieltorListView(ListAPIView):
 
     def get_queryset(self):
         from django.db.models import Q
-        from datetime import timedelta
-        
+        from apps.obuna.models import Obuna
+
         qs = MaklerProfil.objects.select_related('user').prefetch_related('hududlar')
-        
+
         # Filter by verify_holat
         verify_holat = self.request.query_params.get('verify_holat')
         if verify_holat in ['verified', 'pending', 'rejected']:
             qs = qs.filter(verify_holat=verify_holat)
-        
+
         # Filter by faol status
+        # MUHIM: `MaklerProfil.faol` property mantiqiga to'liq mos bo'lishi kerak:
+        #   faol   = NOT bloklangan AND (bepul muddat ichida OR faol obuna bor)
+        #   nofaol = bloklangan OR (bepul muddat tugagan/yo'q AND faol obuna yo'q)
         faol = self.request.query_params.get('faol')
-        if faol == 'true':
-            # Filter for active rieltors (not blocked and has active subscription or trial)
+        if faol in ('true', 'false'):
             now = timezone.now()
-            qs = qs.filter(verify_holat='verified').filter(
-                Q(bepul_muddat_tugash__gte=now) | Q(obunalar__tugash_vaqti__gte=now, obunalar__holat='active')
-            ).distinct()
-        elif faol == 'false':
-            # Filter for inactive rieltors
-            now = timezone.now()
-            qs = qs.filter(
-                Q(verify_holat='rejected') |
-                Q(bepul_muddat_tugash__lt=now)
-            ).distinct()
-        
+
+            # Hozir amal qilayotgan (to'langan, muddati o'tmagan) obunaga ega
+            # rieltorlarning ID lari. Obuna holati = FAOL ('faol'), 'active' EMAS.
+            faol_obuna_idlari = list(
+                Obuna.objects.filter(
+                    holat=Obuna.Holat.FAOL,
+                    tugash_vaqti__gt=now,
+                ).values_list('rieltor_id', flat=True)
+            )
+
+            # Ishlash huquqi bor (bloklanmagan VA (bepul muddat ichida YOKI faol obuna))
+            ishlay_oladi = ~Q(verify_holat=MaklerProfil.VerifyHolat.REJECTED) & (
+                Q(bepul_muddat_tugash__gte=now) | Q(id__in=faol_obuna_idlari)
+            )
+
+            if faol == 'true':
+                qs = qs.filter(ishlay_oladi).distinct()
+            else:  # 'false'
+                qs = qs.exclude(ishlay_oladi).distinct()
+
         return qs
 
     @extend_schema(
