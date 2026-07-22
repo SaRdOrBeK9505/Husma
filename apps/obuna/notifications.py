@@ -16,52 +16,42 @@ def _telegram_id(obuna) -> int | None:
 def _obunalar_tugmasi():
     """Obunalar sahifasiga o'tish tugmasi.
 
-    Bot ichidagi "Open" tugmasi bilan AYNAN BIR XIL ishlashi uchun Telegram
-    direct-link Mini App (t.me/bot/app) ishlatiladi:
-      - Desktop va mobil'da bir xil ochiladi.
-      - Ilova root'dan (bosh) yuklanadi -> SPA to'g'ri init bo'ladi ->
-        initData (auth) to'liq keladi -> rieltor paneli ma'lumotlari yuklanadi.
-      - Obuna sahifasiga yo'naltirish `startapp` parametri orqali beriladi.
-        Frontend `initDataUnsafe.start_param` ni o'qib obuna sahifasiga
-        o'tkazishi kerak.
+    Bot ichidagi "Open" tugmasi bilan AYNAN BIR XIL ishlashi uchun inline
+    `web_app` tugmasi ilovaning hosted domeni ROOT'iga yo'naltiriladi:
+      - `web_app` tugmasi Telegram tomonidan `initData` (auth) bilan ochiladi,
+        xuddi "Open" tugmasi kabi -> rieltor paneli/arizalar yuklanadi.
+      - Desktop va mobil'da bir xil ishlaydi.
+      - ROOT'ga yo'naltiramiz (path QO'SHMAYMIZ), chunki `/obuna` kabi chuqur
+        path SPA/auth init'ini buzadi (ilgari shu sabab ma'lumot kelmagan).
+      - Obuna sahifasiga o'tish signali `startapp` QUERY parametri orqali
+        beriladi. Frontend `Telegram.WebApp.initDataUnsafe.start_param` yoki
+        URL query'dagi `startapp` ni o'qib obuna sahifasiga o'tkazishi kerak.
 
-    MUHIM: web_app tugmasiga to'g'ridan-to'g'ri chuqur (/obuna) manzil berilsa,
-    webview ilovani noto'g'ri yuklaydi (initData yo'q, ma'lumot kelmaydi).
-    Shuning uchun bu yerda direct-link + startapp usuli ishlatiladi.
+    MUHIM: bu yerda `t.me/...` link (direct-link) ISHLATILMAYDI, chunki uni
+    oddiy `url` tugma orqali ochish "Open" bilan bir xil launch kontekstini
+    (initData) bermaydi -> ilova autentifikatsiyasiz ochiladi.
     """
-    base_url = settings.TELEGRAM_MINI_APP_URL.rstrip('/')
+    # Mini App HOSTED domeni (BotFather "Open" ochadigan URL) ishlatiladi.
+    # Bu MULTICARD uchun ishlatiladigan WEB_APP_URL dan farq qilishi mumkin.
+    base_url = (
+        settings.MINI_APP_WEB_URL
+        or settings.WEB_APP_URL
+        or settings.TELEGRAM_MINI_APP_URL
+    ).rstrip('/')
 
-    is_direct_link = base_url.startswith('https://t.me/')
+    # startapp query obuna sahifasini signal qiladi (path QO'SHILMAYDI).
+    if 'startapp=' in base_url:
+        final_url = base_url
+    else:
+        sep = '&' if '?' in base_url else '?'
+        final_url = f"{base_url}{sep}startapp=obuna"
 
-    if is_direct_link:
-        # t.me/bot/app -> t.me/bot/app?startapp=obuna
-        if 'startapp=' in base_url:
-            final_url = base_url
-        else:
-            sep = '&' if '?' in base_url else '?'
-            final_url = f"{base_url}{sep}startapp=obuna"
-
-        # Direct-link Mini App oddiy "url" tugmasi orqali ochiladi
-        # (Open tugmasi bilan bir xil xatti-harakat, initData bilan).
-        return {
-            "inline_keyboard": [
-                [
-                    {
-                        "text": "📦 Obunalar sahifasiga o'tish",
-                        "url": final_url,
-                    }
-                ]
-            ]
-        }
-
-    # Fallback: agar direct-link sozlanmagan bo'lsa, web domenni web_app
-    # sifatida ochamiz (ilova root'dan yuklanishi uchun /obuna qo'shmaymiz).
     return {
         "inline_keyboard": [
             [
                 {
                     "text": "📦 Obunalar sahifasiga o'tish",
-                    "web_app": {"url": base_url},
+                    "web_app": {"url": final_url},
                 }
             ]
         ]

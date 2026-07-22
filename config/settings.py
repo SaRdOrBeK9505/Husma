@@ -272,10 +272,14 @@ MULTICARD_RETURN_URL = os.getenv(
 )
 
 # Frontend URL'lar
-# TELEGRAM_MINI_APP_URL - Telegram xabar tugmalari uchun (mini app)
+# TELEGRAM_MINI_APP_URL - Telegram xabar tugmalari uchun (t.me direct-link)
 # WEB_APP_URL - Brauzer/web uchun (multicard return va boshqalar)
+# MINI_APP_WEB_URL - Mini App HOSTED domeni (BotFather "Open" ochadigan URL).
+#   web_app inline tugmasi aynan shu domenni ochishi kerak, aks holda "Open"
+#   dan boshqa (autentifikatsiyasiz) ilova ochiladi.
 TELEGRAM_MINI_APP_URL = os.getenv('TELEGRAM_MINI_APP_URL', '')
 WEB_APP_URL = os.getenv('WEB_APP_URL', '')
+MINI_APP_WEB_URL = os.getenv('MINI_APP_WEB_URL', '')
 
 # Backward compatibility - eski FRONTEND_URL
 # Agar yangi URL'lar bo'sh bo'lsa, eski FRONTEND_URL ishlatiladi
