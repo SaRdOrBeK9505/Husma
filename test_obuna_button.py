@@ -37,13 +37,19 @@ def main():
         sys.exit(1)
 
     tugma = _obunalar_tugmasi()
-    tugma_url = tugma['inline_keyboard'][0][0]['web_app']['url']
+    button = tugma['inline_keyboard'][0][0]
+    if 'web_app' in button:
+        tugma_turi = 'web_app (Mini App)'
+        tugma_url = button['web_app']['url']
+    else:
+        tugma_turi = 'url (direct-link Mini App)'
+        tugma_url = button['url']
 
     print("=" * 70)
     print("Sozlamalar:")
     print(f"  WEB_APP_URL           = {settings.WEB_APP_URL or '(bosh)'}")
     print(f"  TELEGRAM_MINI_APP_URL = {settings.TELEGRAM_MINI_APP_URL or '(bosh)'}")
-    print(f"  Tugma turi            = web_app (Mini App)")
+    print(f"  Tugma turi            = {tugma_turi}")
     print(f"  Tugma URL             = {tugma_url}")
     print("=" * 70)
 
