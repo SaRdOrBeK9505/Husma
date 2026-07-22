@@ -15,7 +15,12 @@ from .serializers import (
     RieltorLoginSerializer,
     RieltorLoginResponseSerializer,
     RieltorObunaHolatiSerializer,
+    AdminRieltorBlockSerializer,
 )
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class RieltorProfilView(RetrieveUpdateAPIView):
@@ -194,6 +199,89 @@ class AdminRieltorListView(ListAPIView):
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
+
+
+class AdminRieltorBlockView(APIView):
+    """
+    Admin rieltorni bloklaydi yoki blokdan chiqaradi.
+
+    Bloklash = verify_holat REJECTED. Bunda rieltorning obuna/bepul muddati
+    bo'lsa ham `faol` property False qaytaradi — u arizalarga kira olmaydi
+    va unga yangi ariza tarqatilmaydi.
+    """
+    permission_classes = [IsAdmin]
+
+    @extend_schema(
+        summary="Rieltorni bloklash / blokdan chiqarish (Admin)",
+        description=(
+            "Admin berilgan rieltor profilini bloklaydi yoki blokdan chiqaradi.\n\n"
+            "- `blok=true` — rieltor bloklanadi (verify_holat = rejected). "
+            "Obuna/bepul muddatidan qat'i nazar rieltor ishlay olmaydi.\n"
+            "- `blok=false` — rieltor blokdan chiqariladi (verify_holat = verified).\n\n"
+            "URL'dagi `pk` — MaklerProfil id."
+        ),
+        request=AdminRieltorBlockSerializer,
+        responses={
+            200: OpenApiResponse(
+                description="Holat o'zgartirildi",
+                examples=[OpenApiExample(
+                    name="Bloklandi",
+                    value={
+                        "message": "Rieltor bloklandi",
+                        "rieltor": {
+                            "id": 1,
+                            "verify_holat": "rejected",
+                            "bloklangan": True,
+                            "faol": False,
+                        }
+                    }
+                )]
+            ),
+            400: OpenApiResponse(description="Validatsiya xatosi"),
+            404: OpenApiResponse(description="Rieltor profili topilmadi"),
+        },
+        tags=["Admin"],
+    )
+    def post(self, request, pk):
+        serializer = AdminRieltorBlockSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            rieltor = MaklerProfil.objects.select_related('user').get(pk=pk)
+        except MaklerProfil.DoesNotExist:
+            return Response(
+                {'error': "Rieltor profili topilmadi"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        blok = serializer.validated_data['blok']
+        sabab = serializer.validated_data.get('sabab', '')
+
+        if blok:
+            rieltor.verify_holat = MaklerProfil.VerifyHolat.REJECTED
+            xabar = "Rieltor bloklandi"
+        else:
+            rieltor.verify_holat = MaklerProfil.VerifyHolat.VERIFIED
+            xabar = "Rieltor blokdan chiqarildi"
+
+        rieltor.save(update_fields=['verify_holat', 'updated_at'])
+
+        logger.info(
+            "Admin (id=%s) rieltorni (id=%s, user=%s) %s. Sabab: %s",
+            request.user.id, rieltor.id, rieltor.user_id,
+            "bloklandi" if blok else "blokdan chiqarildi",
+            sabab or "—",
+        )
+
+        return Response({
+            "message": xabar,
+            "rieltor": {
+                "id": rieltor.id,
+                "verify_holat": rieltor.verify_holat,
+                "bloklangan": rieltor.bloklangan,
+                "faol": rieltor.faol,
+            }
+        }, status=status.HTTP_200_OK)
 
 
 class AdminStatistikaView(APIView):

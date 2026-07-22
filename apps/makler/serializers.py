@@ -104,6 +104,22 @@ class RieltorVerifySerializer(serializers.ModelSerializer):
         fields = ['verify_holat']
 
 
+class AdminRieltorBlockSerializer(serializers.Serializer):
+    """
+    Admin rieltorni bloklash / blokdan chiqarish uchun.
+
+    blok=True  -> verify_holat REJECTED bo'ladi (rieltor ishlay olmaydi)
+    blok=False -> verify_holat VERIFIED bo'ladi (rieltor qayta faollashadi)
+    """
+    blok = serializers.BooleanField(
+        help_text="True — bloklash, False — blokdan chiqarish"
+    )
+    sabab = serializers.CharField(
+        required=False, allow_blank=True, max_length=500,
+        help_text="Bloklash sababi (ixtiyoriy, log uchun)"
+    )
+
+
 class RieltorLoginSerializer(serializers.Serializer):
     """Rieltor login so'rovi uchun (Swagger docs)"""
     username = serializers.CharField(
