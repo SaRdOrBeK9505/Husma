@@ -170,16 +170,7 @@ class KvartiraYaratishSerializer(serializers.ModelSerializer):
         help_text="Planirovka (floor plan) rasmlari"
     )
 
-    # Viloyat va tuman (hudud) — majburiy. Bo'sh qoldirib bo'lmaydi.
-    viloyat = serializers.PrimaryKeyRelatedField(
-        queryset=Viloyat.objects.all(),
-        required=True,
-        allow_null=False,
-        error_messages={
-            'required': "Viloyatni tanlash majburiy.",
-            'null': "Viloyatni tanlash majburiy.",
-        },
-    )
+    # Tuman (hudud) — MAJBURIY. Bo'sh qoldirib bo'lmaydi.
     hudud = serializers.PrimaryKeyRelatedField(
         queryset=Hudud.objects.all(),
         required=True,
@@ -188,6 +179,13 @@ class KvartiraYaratishSerializer(serializers.ModelSerializer):
             'required': "Tumanni tanlash majburiy.",
             'null': "Tumanni tanlash majburiy.",
         },
+    )
+    # Viloyat — ixtiyoriy yuboriladi; yuborilmasa tumandan avtomatik olinadi.
+    # ("Barchasi" kabi bo'sh qiymat yuborilsa ham xato bermaydi.)
+    viloyat = serializers.PrimaryKeyRelatedField(
+        queryset=Viloyat.objects.all(),
+        required=False,
+        allow_null=True,
     )
 
     class Meta:
@@ -214,6 +212,22 @@ class KvartiraYaratishSerializer(serializers.ModelSerializer):
     def validate_planirovkalar(self, value):
         umumiy_hajmni_tekshir(value)
         return value
+
+    def validate(self, attrs):
+        """
+        Viloyat berilmagan (yoki "Barchasi" kabi bo'sh) bo'lsa — uni
+        tanlangan tumandan (hudud) avtomatik olamiz. Shunda foydalanuvchi
+        faqat tumanni tanlasa yetarli.
+        """
+        hudud = attrs.get('hudud')
+        # PATCH/PUT da hudud yuborilmasa — mavjud instance'dan olamiz
+        if hudud is None and self.instance is not None:
+            hudud = self.instance.hudud
+
+        if not attrs.get('viloyat'):
+            if hudud is not None and hudud.viloyat_id:
+                attrs['viloyat'] = hudud.viloyat
+        return attrs
 
     def _rasm_limitini_tekshir(self, kvartira, yangi_rasmlar):
         """Mavjud + yangi rasmlar 8 tadan oshmasligini tekshiradi."""
