@@ -231,7 +231,7 @@ class RieltorKvartiraRasmView(APIView):
         tags=["Kvartira - Rieltor"],
     )
     def post(self, request, pk):
-        from .serializers import MAX_RASM_SONI
+        from .serializers import MAX_RASM_SONI, heic_ni_jpegga_aylantir
         kvartira = self.get_object(request, pk)
         serializer = KvartiraRasmYuklashSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -249,7 +249,7 @@ class RieltorKvartiraRasmView(APIView):
         yaratilgan = []
         for i, rasm in enumerate(yangi_rasmlar):
             obj = KvartiraRasm.objects.create(
-                kvartira=kvartira, rasm=rasm,
+                kvartira=kvartira, rasm=heic_ni_jpegga_aylantir(rasm),
                 asosiy=(not bosh_rasm_bormi and i == 0),
                 tartib=mavjud + i
             )

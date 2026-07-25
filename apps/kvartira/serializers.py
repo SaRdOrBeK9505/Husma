@@ -1,6 +1,22 @@
+from io import BytesIO
+
 from rest_framework import serializers
+from django.core.files.base import ContentFile
+from PIL import Image, ImageOps
+
 from .models import Kvartira, KvartiraRasm, KvartiraPlanirovka
 from apps.hudud.models import Viloyat, Hudud
+
+# --- HEIC/HEIF (iPhone rasmlari) qo'llab-quvvatlash ---
+# pillow-heif kutubxonasi o'rnatilgan bo'lsa, Pillow HEIC faylini ham o'qiy
+# oladi. O'rnatilmagan bo'lsa — app ishlashda davom etadi (faqat HEIC qabul
+# qilinmaydi), shuning uchun import xatoni yutamiz.
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    HEIC_QOLLAB_QUVVATLANADI = True
+except Exception:  # pragma: no cover - kutubxona yo'q bo'lsa
+    HEIC_QOLLAB_QUVVATLANADI = False
 
 # Bitta e'longa ruxsat etilgan maksimal rasm soni (owner talabi: 8 tagacha)
 MAX_RASM_SONI = 8
@@ -17,12 +33,20 @@ MAX_UMUMIY_HAJMI_MB = 20
 MAX_UMUMIY_HAJMI = MAX_UMUMIY_HAJMI_MB * 1024 * 1024
 
 # Ruxsat etilgan rasm MIME turlari (formatlar).
+# HEIC/HEIF — iPhone standart formati. Ular qabul qilinadi, lekin saqlashdan
+# oldin JPEG'ga aylantiriladi (web brauzerlar HEIC'ni ko'rsata olmaydi).
 RUXSAT_MIME_TURLARI = {
     'image/jpeg',
     'image/png',
     'image/webp',
+    'image/heic',
+    'image/heif',
 }
-RUXSAT_KENGAYTMALAR = ('.jpg', '.jpeg', '.png', '.webp')
+RUXSAT_KENGAYTMALAR = ('.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif')
+
+# HEIC/HEIF fayllarni aniqlash uchun.
+HEIC_MIME_TURLARI = {'image/heic', 'image/heif'}
+HEIC_KENGAYTMALAR = ('.heic', '.heif')
 
 
 def rasm_faylini_tekshir(fayl):
@@ -85,6 +109,43 @@ def umumiy_hajmni_tekshir(fayllar):
             f"Ruxsat etilgan umumiy hajm — {MAX_UMUMIY_HAJMI_MB} MB. "
             f"Rasmlarni kamaytiring yoki siqib (kichraytirib) yuklang."
         )
+
+
+def _heic_faylmi(fayl):
+    """Fayl HEIC/HEIF formatida ekanligini nom yoki content_type bo'yicha aniqlaydi."""
+    nomi = (getattr(fayl, 'name', '') or '').lower()
+    content_type = (getattr(fayl, 'content_type', '') or '').lower()
+    return nomi.endswith(HEIC_KENGAYTMALAR) or content_type in HEIC_MIME_TURLARI
+
+
+def heic_ni_jpegga_aylantir(fayl):
+    """
+    Agar fayl HEIC/HEIF (iPhone) formatida bo'lsa — uni JPEG'ga aylantirib
+    qaytaradi. Boshqa formatlar (JPEG/PNG/WEBP) o'zgarishsiz qaytariladi.
+
+    MUHIM:
+    - EXIF orientation hisobga olinadi (`exif_transpose`) — aks holda iPhone
+      rasmlari yon tomonga ag'darilib saqlanadi.
+    - pillow-heif o'rnatilmagan bo'lsa (HEIC_QOLLAB_QUVVATLANADI=False) —
+      fayl o'zgarishsiz qaytariladi (bunda ImageField uni rad etadi).
+    """
+    if not _heic_faylmi(fayl) or not HEIC_QOLLAB_QUVVATLANADI:
+        return fayl
+
+    # Faylni boshidan o'qishga tayyorlaymiz
+    if hasattr(fayl, 'seek'):
+        fayl.seek(0)
+
+    rasm = Image.open(fayl)
+    # EXIF orientation'ni to'g'rilash (iPhone rasmlari uchun kritik)
+    rasm = ImageOps.exif_transpose(rasm)
+    rasm = rasm.convert('RGB')
+
+    buffer = BytesIO()
+    rasm.save(buffer, format='JPEG', quality=85, optimize=True)
+
+    asl_nomi = (getattr(fayl, 'name', '') or 'rasm').rsplit('.', 1)[0]
+    return ContentFile(buffer.getvalue(), name=f"{asl_nomi}.jpg")
 
 
 class KvartiraRasmSerializer(serializers.ModelSerializer):
@@ -247,11 +308,13 @@ class KvartiraYaratishSerializer(serializers.ModelSerializer):
 
         for i, rasm in enumerate(rasmlar):
             KvartiraRasm.objects.create(
-                kvartira=kvartira, rasm=rasm,
+                kvartira=kvartira, rasm=heic_ni_jpegga_aylantir(rasm),
                 asosiy=(i == 0), tartib=i
             )
         for rasm in planirovkalar:
-            KvartiraPlanirovka.objects.create(kvartira=kvartira, rasm=rasm)
+            KvartiraPlanirovka.objects.create(
+                kvartira=kvartira, rasm=heic_ni_jpegga_aylantir(rasm)
+            )
         return kvartira
 
     def update(self, instance, validated_data):
@@ -270,13 +333,15 @@ class KvartiraYaratishSerializer(serializers.ModelSerializer):
             bosh_rasm_bormi = instance.rasmlar.filter(asosiy=True).exists()
             for i, rasm in enumerate(rasmlar):
                 KvartiraRasm.objects.create(
-                    kvartira=instance, rasm=rasm,
+                    kvartira=instance, rasm=heic_ni_jpegga_aylantir(rasm),
                     asosiy=(not bosh_rasm_bormi and i == 0),
                     tartib=mavjud + i
                 )
         if planirovkalar:
             for rasm in planirovkalar:
-                KvartiraPlanirovka.objects.create(kvartira=instance, rasm=rasm)
+                KvartiraPlanirovka.objects.create(
+                    kvartira=instance, rasm=heic_ni_jpegga_aylantir(rasm)
+                )
         return instance
 
 
