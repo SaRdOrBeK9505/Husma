@@ -5,8 +5,16 @@ Mavjud `apps.users.otp_service.telegram_xabar_yuborish` infratuzilmasidan
 foydalanadi. Xabar yuborilmasa (bot bloklangan va h.k.) jim o'tadi — bu
 biznes-logikani to'xtatmasligi kerak.
 """
+from pathlib import Path
 from django.conf import settings
-from apps.users.otp_service import telegram_xabar_yuborish
+from apps.users.otp_service import (
+    telegram_xabar_yuborish,
+    telegram_rasm_yuborish,
+)
+
+# Promo rasm yo'li — foydalanuvchi shu faylni joylashi kerak:
+#   assets/promo/obuna_promo.jpg
+PROMO_OBUNA_RASM = settings.BASE_DIR / 'assets' / 'promo' / 'obuna_promo.jpg'
 
 
 def _telegram_id(obuna) -> int | None:
@@ -104,24 +112,67 @@ def obuna_tugadi_xabar(obuna):
     return telegram_xabar_yuborish(tg_id, matn, reply_markup=_obunalar_tugmasi())
 
 
-def bepul_muddat_tugadi_xabar(rieltor):
+def _obuna_promo_matni() -> str:
+    """Rieltorlarga yuboriladigan obuna promo (aksiya) matni.
+
+    Rasmdagi matn bilan AYNAN bir xil (formatlash HTML orqali).
     """
-    7 kunlik bepul sinov muddati tugaganda rieltorga xabar.
-    
+    return (
+        "❗️ <b>Bepul sinov muddati yakunlandi.</b>\n\n"
+        "Shu sababli sizga <b>yangi mijozlar (lidlar) yuborilishi vaqtincha "
+        "to‘xtatildi.</b>\n\n"
+        "Bugunoq obunangizni faollashtiring va yana har kuni yangi "
+        "buyurtmalarni qabul qilishni boshlang.\n\n"
+        "🎉 <b>Faqat hozir birinchi oylik obuna 50% chegirma bilan!</b>\n\n"
+        "<s>99 000 so‘m</s> ➡️ <b>49 500 so‘m</b>\n\n"
+        "⌛️ <b>Aksiya cheklangan muddat davom etadi. Imkoniyatni qo‘ldan "
+        "boy bermang!</b>\n\n"
+        "👉 <b>Bot orqali obunangizni faollashtiring va yangi mijozlarni qabul "
+        "qilishni davom ettiring.</b>"
+    )
+
+
+def obuna_promo_xabar(rieltor) -> bool:
+    """
+    Rieltorga obuna promo (aksiya) xabarini yuboradi.
+
+    Agar `assets/promo/obuna_promo.jpg` mavjud bo'lsa — rasm + caption sifatida,
+    aks holda oddiy matnli xabar sifatida yuboriladi. Ikkala holatda ham
+    obunalar sahifasiga o'tish tugmasi qo'shiladi.
+
     Args:
         rieltor: MaklerProfil instance
+
+    Returns:
+        bool: xabar yuborilgan bo'lsa True, aks holda False
     """
     tg_id = getattr(rieltor.user, 'telegram_id', None)
     if not tg_id:
         return False
 
-    matn = (
-        f"🎁 <b>Bepul sinov muddati tugadi</b>\n\n"
-        f"7 kunlik bepul sinov muddatingiz tugadi. "
-        f"Xizmatdan foydalanishni davom ettirish uchun obuna sotib oling.\n\n"
-        f"💎 Bizning tariflarimiz bilan tanishing va o'zingizga mos tarifni tanlang!"
-    )
-    return telegram_xabar_yuborish(tg_id, matn, reply_markup=_obunalar_tugmasi())
+    matn = _obuna_promo_matni()
+
+    # Tugma hozircha olib qo'yildi — faqat rasm + matn yuboriladi.
+    if Path(PROMO_OBUNA_RASM).is_file():
+        yuborildi = telegram_rasm_yuborish(
+            tg_id, str(PROMO_OBUNA_RASM), caption=matn
+        )
+        if yuborildi:
+            return True
+        # Rasm yuborilmasa (masalan API xatosi) — matnli fallback
+    return telegram_xabar_yuborish(tg_id, matn)
+
+
+def bepul_muddat_tugadi_xabar(rieltor):
+    """
+    7 kunlik bepul sinov muddati tugaganda rieltorga promo (aksiya) xabari.
+
+    Rasm mavjud bo'lsa rasm bilan, bo'lmasa matnli ko'rinishda yuboriladi.
+
+    Args:
+        rieltor: MaklerProfil instance
+    """
+    return obuna_promo_xabar(rieltor)
 
 
 def qoshimcha_bepul_muddat_tabrik_xabar(rieltor, kun: int):
