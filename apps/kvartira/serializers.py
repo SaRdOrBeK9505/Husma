@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Kvartira, KvartiraRasm, KvartiraPlanirovka
+from apps.hudud.models import Viloyat, Hudud
 
 # Bitta e'longa ruxsat etilgan maksimal rasm soni (owner talabi: 8 tagacha)
 MAX_RASM_SONI = 8
@@ -8,6 +9,12 @@ MAX_RASM_SONI = 8
 # katta fayllar rad etiladi — DoS/resurs va DigitalOcean Spaces xarajati himoyasi.
 MAX_RASM_HAJMI_MB = 10
 MAX_RASM_HAJMI = MAX_RASM_HAJMI_MB * 1024 * 1024
+
+# Bitta e'longa yuklanadigan barcha rasmlarning UMUMIY maksimal hajmi (baytda).
+# Bu nginx `client_max_body_size` bilan mos bo'lishi kerak (nginx biroz kattaroq
+# — masalan 25M — bo'lsin, chunki so'rovda rasmdan tashqari boshqa maydonlar ham bor).
+MAX_UMUMIY_HAJMI_MB = 20
+MAX_UMUMIY_HAJMI = MAX_UMUMIY_HAJMI_MB * 1024 * 1024
 
 # Ruxsat etilgan rasm MIME turlari (formatlar).
 RUXSAT_MIME_TURLARI = {
@@ -55,6 +62,29 @@ def rasm_faylini_tekshir(fayl):
         )
 
     return fayl
+
+
+def umumiy_hajmni_tekshir(fayllar):
+    """
+    Yuklangan rasmlar ro'yxatining UMUMIY hajmini tekshiradi.
+
+    Har bir fayl alohida `MAX_RASM_HAJMI` bilan cheklangan bo'lsa ham,
+    ko'p fayl birga kelganda umumiy hajm server/nginx limitidan oshib
+    413 (Request Entity Too Large) xatosini keltirib chiqarishi mumkin.
+    Bu validator umumiy hajmni oldindan cheklab, aniq xabar beradi.
+
+    Raises:
+        serializers.ValidationError: umumiy hajm ruxsat etilgandan katta bo'lsa.
+    """
+    jami = 0
+    for fayl in fayllar:
+        jami += getattr(fayl, 'size', 0) or 0
+    if jami > MAX_UMUMIY_HAJMI:
+        raise serializers.ValidationError(
+            f"Rasmlarning umumiy hajmi juda katta ({jami / (1024 * 1024):.1f} MB). "
+            f"Ruxsat etilgan umumiy hajm — {MAX_UMUMIY_HAJMI_MB} MB. "
+            f"Rasmlarni kamaytiring yoki siqib (kichraytirib) yuklang."
+        )
 
 
 class KvartiraRasmSerializer(serializers.ModelSerializer):
@@ -140,6 +170,26 @@ class KvartiraYaratishSerializer(serializers.ModelSerializer):
         help_text="Planirovka (floor plan) rasmlari"
     )
 
+    # Viloyat va tuman (hudud) — majburiy. Bo'sh qoldirib bo'lmaydi.
+    viloyat = serializers.PrimaryKeyRelatedField(
+        queryset=Viloyat.objects.all(),
+        required=True,
+        allow_null=False,
+        error_messages={
+            'required': "Viloyatni tanlash majburiy.",
+            'null': "Viloyatni tanlash majburiy.",
+        },
+    )
+    hudud = serializers.PrimaryKeyRelatedField(
+        queryset=Hudud.objects.all(),
+        required=True,
+        allow_null=False,
+        error_messages={
+            'required': "Tumanni tanlash majburiy.",
+            'null': "Tumanni tanlash majburiy.",
+        },
+    )
+
     class Meta:
         model = Kvartira
         fields = [
@@ -158,6 +208,11 @@ class KvartiraYaratishSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f"Ko'pi bilan {MAX_RASM_SONI} ta rasm yuklash mumkin."
             )
+        umumiy_hajmni_tekshir(value)
+        return value
+
+    def validate_planirovkalar(self, value):
+        umumiy_hajmni_tekshir(value)
         return value
 
     def _rasm_limitini_tekshir(self, kvartira, yangi_rasmlar):
@@ -225,6 +280,11 @@ class KvartiraRasmYuklashSerializer(serializers.Serializer):
         allow_empty=False,
         help_text=(
             f"Yangi rasmlar — jami {MAX_RASM_SONI} tadan oshmasin, "
-            f"har biri {MAX_RASM_HAJMI_MB} MB gacha (JPEG/PNG/WEBP)"
+            f"har biri {MAX_RASM_HAJMI_MB} MB gacha (JPEG/PNG/WEBP), "
+            f"umumiy hajmi {MAX_UMUMIY_HAJMI_MB} MB gacha"
         )
     )
+
+    def validate_rasmlar(self, value):
+        umumiy_hajmni_tekshir(value)
+        return value
