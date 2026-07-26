@@ -37,7 +37,7 @@ class KvartiraAdmin(admin.ModelAdmin):
             'fields': ('narx', 'valyuta', 'narx_davri')
         }),
         ('Xarakteristikalar', {
-            'fields': ('xonalar_soni', 'hammom_soni', 'maydon_m2',
+            'fields': ('xonalar_soni', 'sanuzellar_soni', 'maydon_m2',
                        'qavat', 'jami_qavat', 'remont_holati', 'mebel')
         }),
         ('Joylashuv', {

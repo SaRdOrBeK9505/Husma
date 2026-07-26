@@ -12,7 +12,17 @@ class Tarif(models.Model):
         max_length=50, unique=True,
         help_text="Texnik kod, masalan: 'oylik', 'yillik'"
     )
-    narx = models.PositiveIntegerField(help_text="So'mda")
+    narx = models.PositiveIntegerField(
+        help_text="Haqiqatda to'lanadigan narx (so'mda). Chegirma bo'lsa — chegirmali narx."
+    )
+    asl_narx = models.PositiveIntegerField(
+        blank=True, null=True,
+        help_text=(
+            "Chegirmagacha bo'lgan asl narx (so'mda). Faqat aksiya/chegirma "
+            "uchun to'ldiriladi. Frontendda ustidan chizib ko'rsatiladi. "
+            "Bo'sh bo'lsa — chegirma yo'q deb hisoblanadi."
+        ),
+    )
     davomiylik_kun = models.PositiveIntegerField(
         help_text="Obuna necha kun amal qiladi (masalan: 30, 90, 365)"
     )
@@ -33,6 +43,28 @@ class Tarif(models.Model):
 
     def __str__(self):
         return f"{self.nomi} — {self.narx:,} so'm / {self.davomiylik_kun} kun"
+
+    @property
+    def chegirma_bormi(self) -> bool:
+        """Aksiya/chegirma mavjudmi — asl_narx to'ldirilgan va narxdan katta bo'lsa."""
+        return bool(self.asl_narx) and self.asl_narx > self.narx
+
+    @property
+    def chegirma_foizi(self) -> int:
+        """
+        Chegirma foizi (butun songa yaxlitlangan).
+        Chegirma yo'q bo'lsa 0 qaytaradi. Masalan: 99000 → 49500 = 50%.
+        """
+        if not self.chegirma_bormi:
+            return 0
+        return round((self.asl_narx - self.narx) / self.asl_narx * 100)
+
+    @property
+    def tejaladigan_summa(self) -> int:
+        """Chegirma tufayli tejaladigan summa (so'mda). Chegirma yo'q bo'lsa 0."""
+        if not self.chegirma_bormi:
+            return 0
+        return self.asl_narx - self.narx
 
 
 class ObunaQuerySet(models.QuerySet):

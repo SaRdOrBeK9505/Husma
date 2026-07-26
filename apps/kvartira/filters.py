@@ -17,7 +17,7 @@ class KvartiraFilter(filters.FilterSet):
     Kvartira uchun kengaytirilgan filtr to'plami.
 
     Query parametrlari (barchasi ixtiyoriy):
-      - hudud, viloyat, mulk_turi, ariza_turi, xonalar_soni, hammom_soni, valyuta
+      - hudud, viloyat, mulk_turi, ariza_turi, xonalar_soni, sanuzellar_soni, valyuta
         → aniq (exact) moslik
       - jami_qavat            → binoning aniq qavatliligi (masalan ?jami_qavat=9)
       - jami_qavat_min / jami_qavat_max → qavatlik diapazoni (masalan ?jami_qavat_max=9)
@@ -42,6 +42,6 @@ class KvartiraFilter(filters.FilterSet):
         model = Kvartira
         fields = [
             'hudud', 'viloyat', 'mulk_turi', 'ariza_turi',
-            'xonalar_soni', 'hammom_soni', 'valyuta',
+            'xonalar_soni', 'sanuzellar_soni', 'valyuta',
             'jami_qavat', 'qavat', 'remont_holati', 'mebel',
         ]

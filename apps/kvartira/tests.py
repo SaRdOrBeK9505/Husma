@@ -464,7 +464,7 @@ class KvartiraValidationTests(KvartiraBaseTestCase):
         """Barcha maydonlar to'g'ri → 201."""
         self.auth(self.rieltor_a)
         payload = self.valid_payload(
-            tavsif='Yaxshi kvartira', hammom_soni=1, maydon_m2=65.5,
+            tavsif='Yaxshi kvartira', sanuzellar_soni=1, maydon_m2=65.5,
             qavat=3, jami_qavat=9, remont_holati=Kvartira.RemontHolati.YEVRO,
             mebel=True, manzil='Chilonzor 5-kvartal', telefon='+998901234567',
         )

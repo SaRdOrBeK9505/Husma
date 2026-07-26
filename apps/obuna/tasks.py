@@ -190,64 +190,68 @@ def obuna_tugash_xabarnomasi():
                 obuna.id, exc, exc_info=True
             )
     
-    # ===== 2. Bepul sinov muddati tugash — PROMO xabarnomasi =====
-    # DIQQAT: hozircha VAQTINCHA O'CHIRILGAN.
-    # Sabab: obuna narxlari/logikasi hali yakuniy emas. Logika to'g'rilangach,
-    # quyidagi blokni izohdan chiqarib qayta yoqamiz.
-    #
-    # Kimga yuboriladi (yoqilganda):
+    # ===== 2. Bepul sinov muddati tugash — PROMO (aksiya) xabarnomasi =====
+    # Kimga yuboriladi:
     #   1. Bepul sinov muddati tugagan (bepul_muddat_tugash < now)
     #   2. HECH QACHON pul to'lamagan — muvaffaqiyatli to'lovi (Tolov) yo'q
     #   3. Ayni paytda faol obunasi yo'q (qo'shimcha xavfsizlik sharti)
+    #   4. Bu rieltorga promo xabari HALI YUBORILMAGAN
+    #      (promo_xabar_yuborildi=False) — bir marta borgan odamga qayta bormaydi.
     bepul_xabar_soni = 0
 
-    # --- QAYTA YOQISH UCHUN: pastdagi blokni izohdan chiqaring ---
-    #
-    # # Hech qachon muvaffaqiyatli to'lov qilgan rieltorlar (ularga yubormaymiz)
-    # tolagan_rieltor_idlari = (
-    #     Tolov.objects
-    #     .filter(holat=Tolov.Holat.MUVAFFAQIYATLI)
-    #     .values_list('obuna__rieltor_id', flat=True)
-    #     .distinct()
-    # )
-    #
-    # tugagan_bepul = (
-    #     MaklerProfil.objects
-    #     .filter(
-    #         bepul_muddat_tugash__lte=now,
-    #         bepul_muddat_tugash__isnull=False,
-    #     )
-    #     .exclude(id__in=tolagan_rieltor_idlari)  # pul to'laganlarni chiqarib tashlash
-    #     .select_related('user')
-    # )
-    #
-    # for rieltor in tugagan_bepul:
-    #     try:
-    #         # Qo'shimcha xavfsizlik: faol obunasi bo'lsa yubormaymiz
-    #         if rieltor.obuna_faol:
-    #             continue
-    #
-    #         try:
-    #             from .notifications import bepul_muddat_tugadi_xabar
-    #             if bepul_muddat_tugadi_xabar(rieltor):
-    #                 bepul_xabar_soni += 1
-    #                 logger.info(
-    #                     "[Bepul Muddat Tugash] Xabar yuborildi: rieltor_id=%s telegram_id=%s",
-    #                     rieltor.id,
-    #                     rieltor.user.telegram_id,
-    #                 )
-    #         except Exception as notif_exc:
-    #             logger.warning(
-    #                 "[Bepul Muddat Tugash] Xabar yuborishda xato: rieltor_id=%s err=%s",
-    #                 rieltor.id, notif_exc
-    #             )
-    #
-    #     except Exception as exc:
-    #         logger.error(
-    #             "[Bepul Muddat Tugash] Rieltorni tekshirishda xato: rieltor_id=%s err=%s",
-    #             rieltor.id, exc, exc_info=True
-    #         )
-    logger.info("[Bepul Muddat Tugash] PROMO xabarnomasi VAQTINCHA O'CHIRILGAN")
+    # Hech qachon muvaffaqiyatli to'lov qilgan rieltorlar (ularga yubormaymiz)
+    tolagan_rieltor_idlari = (
+        Tolov.objects
+        .filter(holat=Tolov.Holat.MUVAFFAQIYATLI)
+        .values_list('obuna__rieltor_id', flat=True)
+        .distinct()
+    )
+
+    tugagan_bepul = (
+        MaklerProfil.objects
+        .filter(
+            bepul_muddat_tugash__lte=now,
+            bepul_muddat_tugash__isnull=False,
+            promo_xabar_yuborildi=False,       # oldin xabar bormaganlar
+        )
+        .exclude(id__in=tolagan_rieltor_idlari)  # pul to'laganlarni chiqarib tashlash
+        .select_related('user')
+    )
+
+    for rieltor in tugagan_bepul:
+        try:
+            # Qo'shimcha xavfsizlik: faol obunasi bo'lsa yubormaymiz
+            if rieltor.obuna_faol:
+                continue
+
+            try:
+                from .notifications import bepul_muddat_tugadi_xabar
+                if bepul_muddat_tugadi_xabar(rieltor):
+                    # Faqat xabar HAQIQATDA yuborilganda flagni belgilaymiz —
+                    # shunda qayta yuborilmaydi. Yuborilmasa keyingi kuni
+                    # yana urinib ko'riladi.
+                    rieltor.promo_xabar_yuborildi = True
+                    rieltor.promo_xabar_vaqti = timezone.now()
+                    rieltor.save(update_fields=[
+                        'promo_xabar_yuborildi', 'promo_xabar_vaqti', 'updated_at'
+                    ])
+                    bepul_xabar_soni += 1
+                    logger.info(
+                        "[Bepul Muddat Tugash] Promo xabar yuborildi: rieltor_id=%s telegram_id=%s",
+                        rieltor.id,
+                        rieltor.user.telegram_id,
+                    )
+            except Exception as notif_exc:
+                logger.warning(
+                    "[Bepul Muddat Tugash] Xabar yuborishda xato: rieltor_id=%s err=%s",
+                    rieltor.id, notif_exc
+                )
+
+        except Exception as exc:
+            logger.error(
+                "[Bepul Muddat Tugash] Rieltorni tekshirishda xato: rieltor_id=%s err=%s",
+                rieltor.id, exc, exc_info=True
+            )
     
     logger.info(
         "[Obuna Tugash Task] Umumiy: obuna xabarlari=%s, bepul muddat xabarlari=%s",

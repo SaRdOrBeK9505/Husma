@@ -73,6 +73,18 @@ class MaklerProfil(models.Model):
         help_text="14 kunlik aksiya qachon berilgani (audit uchun)"
     )
 
+    # Bepul muddat tugagach yuboriladigan obuna PROMO (aksiya) xabari uchun
+    # idempotency bayrog'i. True bo'lsa — promo xabar allaqachon yuborilgan,
+    # qayta yuborilmaydi (bir marta borgan odamga qayta bormaydi).
+    promo_xabar_yuborildi = models.BooleanField(
+        default=False,
+        help_text="Bepul muddat tugagach obuna promo (aksiya) xabari yuborilganmi"
+    )
+    promo_xabar_vaqti = models.DateTimeField(
+        blank=True, null=True,
+        help_text="Promo (aksiya) xabari qachon yuborilgani (audit uchun)"
+    )
+
     ortacha_reyting = models.DecimalField(
         max_digits=3,
         decimal_places=2,

@@ -70,6 +70,7 @@ class RieltorProfilAdmin(admin.ModelAdmin):
         'verify_holat',
         ObunaHolatFilter,
         'qoshimcha_bepul_muddat_berildi',
+        'promo_xabar_yuborildi',
     ]
     search_fields = [
         'user__full_name', 'user__telegram_username',
@@ -79,7 +80,7 @@ class RieltorProfilAdmin(admin.ModelAdmin):
     readonly_fields = [
         'ortacha_reyting', 'jami_bitimlar', 'verify_qilingan_vaqt',
         'faol', 'obuna_faol_display', 'obuna_tugash', 'login_malumotlari',
-        'qoshimcha_bepul_muddat_vaqti',
+        'qoshimcha_bepul_muddat_vaqti', 'promo_xabar_vaqti',
     ]
 
     fieldsets = (
@@ -98,13 +99,17 @@ class RieltorProfilAdmin(admin.ModelAdmin):
             'fields': (
                 'bepul_muddat_tugash', 'faol',
                 'qoshimcha_bepul_muddat_berildi', 'qoshimcha_bepul_muddat_vaqti',
+                'promo_xabar_yuborildi', 'promo_xabar_vaqti',
                 'obuna_faol_display', 'obuna_tugash',
             ),
             'description': (
                 "Obuna ma'lumotlari 'Obuna' bo'limidan boshqariladi. "
                 "Bu yerda faqat hisoblangan holat ko'rsatiladi. "
                 "'14 kunlik aksiya berildi' — qo'shimcha bepul muddat aksiyasi "
-                "berilgan-berilmaganini bildiradi (idempotency uchun)."
+                "berilgan-berilmaganini bildiradi (idempotency uchun). "
+                "'promo_xabar_yuborildi' — bepul muddat tugagach obuna promo "
+                "(aksiya) xabari yuborilgan-yuborilmaganini bildiradi. Belgini "
+                "olib tashlasangiz, keyingi kuni 10:00 da xabar qayta yuboriladi."
             ),
         }),
     )

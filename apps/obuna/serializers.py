@@ -6,11 +6,16 @@ from .models import Tarif, Obuna, Tolov
 
 class TarifSerializer(serializers.ModelSerializer):
     """Public/rieltor uchun — faqat ko'rsatiladigan maydonlar."""
+    chegirma_bormi = serializers.BooleanField(read_only=True)
+    chegirma_foizi = serializers.IntegerField(read_only=True)
+    tejaladigan_summa = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Tarif
         fields = [
-            'id', 'nomi', 'kod', 'narx',
+            'id', 'nomi', 'kod', 'narx', 'asl_narx',
             'davomiylik_kun', 'izoh', 'tartib',
+            'chegirma_bormi', 'chegirma_foizi', 'tejaladigan_summa',
         ]
 
 
@@ -19,27 +24,50 @@ class TarifRieltorSerializer(serializers.ModelSerializer):
     Rieltor uchun mos tarifni qaytaradi.
     Agar rieltor oldin obuna qilmagan bo'lsa - birinchi oy narxi,
     aks holda - oddiy oylik narxi.
+
+    narx      → haqiqatda to'lanadigan summa (masalan 49 500)
+    asl_narx  → chegirmagacha narx, ustidan chiziladi (masalan 99 000)
     """
     birinchi_oy_bormi = serializers.BooleanField(read_only=True)
-    
+    chegirma_bormi = serializers.BooleanField(read_only=True)
+    chegirma_foizi = serializers.IntegerField(read_only=True)
+    tejaladigan_summa = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Tarif
         fields = [
-            'id', 'nomi', 'kod', 'narx',
+            'id', 'nomi', 'kod', 'narx', 'asl_narx',
             'davomiylik_kun', 'izoh', 'tartib',
             'birinchi_oy_bormi',
+            'chegirma_bormi', 'chegirma_foizi', 'tejaladigan_summa',
         ]
 
 
 class TarifAdminSerializer(serializers.ModelSerializer):
     """Admin uchun — to'liq CRUD."""
+    chegirma_bormi = serializers.BooleanField(read_only=True)
+    chegirma_foizi = serializers.IntegerField(read_only=True)
+    tejaladigan_summa = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Tarif
         fields = [
-            'id', 'nomi', 'kod', 'narx', 'davomiylik_kun',
-            'izoh', 'tartib', 'is_active', 'created_at', 'updated_at',
+            'id', 'nomi', 'kod', 'narx', 'asl_narx', 'davomiylik_kun',
+            'izoh', 'tartib', 'is_active',
+            'chegirma_bormi', 'chegirma_foizi', 'tejaladigan_summa',
+            'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate(self, attrs):
+        """asl_narx to'ldirilsa, u narxdan katta bo'lishi kerak."""
+        narx = attrs.get('narx', getattr(self.instance, 'narx', None))
+        asl_narx = attrs.get('asl_narx', getattr(self.instance, 'asl_narx', None))
+        if asl_narx is not None and narx is not None and asl_narx <= narx:
+            raise serializers.ValidationError({
+                'asl_narx': "Asl narx chegirmali narxdan katta bo'lishi kerak."
+            })
+        return attrs
 
 
 # ===== TO'LOV =====
@@ -110,7 +138,7 @@ class ObunaYaratishSerializer(serializers.Serializer):
     Natijada Obuna (kutilmoqda) + Tolov (kutilmoqda) yaratiladi.
     
     MUHIM: tarif_id ixtiyoriy. Ko'rsatilmagan bo'lsa:
-    - Birinchi obuna bo'lsa - birinchi_oy (99,000 so'm)
+    - Birinchi obuna bo'lsa - birinchi_oy (49,500 so'm — 50% chegirma, asl 99,000)
     - Aks holda - oylik (199,000 so'm)
     """
     tarif_id = serializers.IntegerField(required=False, allow_null=True)

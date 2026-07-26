@@ -212,7 +212,7 @@ class ObunaSotibOlishView(APIView):
     Payme tanlansa to'lov havolasi (tolov_url) qaytariladi.
     
     MUHIM: Agar tarif_id ko'rsatilmagan bo'lsa, avtomatik mos tarifni tanlaydi:
-    - Birinchi obuna bo'lsa - birinchi_oy (99,000 so'm)
+    - Birinchi obuna bo'lsa - birinchi_oy (49,500 so'm — 50% chegirma, asl 99,000)
     - Aks holda - oylik (199,000 so'm)
     """
     permission_classes = [IsRieltor]
@@ -228,6 +228,9 @@ class ObunaSotibOlishView(APIView):
                     'obuna_id': drf_serializers.IntegerField(),
                     'tolov_id': drf_serializers.IntegerField(),
                     'summa': drf_serializers.IntegerField(),
+                    'asl_narx': drf_serializers.IntegerField(allow_null=True),
+                    'chegirma_bormi': drf_serializers.BooleanField(),
+                    'chegirma_foizi': drf_serializers.IntegerField(),
                     'provayder': drf_serializers.CharField(),
                     'tolov_url': drf_serializers.CharField(required=False),
                     'birinchi_oy_bormi': drf_serializers.BooleanField(),
@@ -292,7 +295,10 @@ class ObunaSotibOlishView(APIView):
             "message": "Obuna yaratildi. To'lovni amalga oshiring.",
             "obuna_id": obuna.id,
             "tolov_id": tolov.id,
-            "summa": tolov.summa,
+            "summa": tolov.summa,                 # haqiqatda to'lanadigan summa (masalan 49 500)
+            "asl_narx": tarif.asl_narx,           # chegirmagacha narx (ustidan chiziladi), yoki null
+            "chegirma_bormi": tarif.chegirma_bormi,
+            "chegirma_foizi": tarif.chegirma_foizi,
             "provayder": provayder,
             "birinchi_oy_bormi": birinchi_oy_bormi,
         }

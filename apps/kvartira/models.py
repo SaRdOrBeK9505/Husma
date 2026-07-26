@@ -100,9 +100,9 @@ class Kvartira(models.Model):
 
     # --- Xarakteristikalar ---
     xonalar_soni = models.CharField(max_length=5, choices=XonalarSoni.choices)
-    hammom_soni = models.PositiveSmallIntegerField(
+    sanuzellar_soni = models.PositiveSmallIntegerField(
         blank=True, null=True,
-        help_text="Vannaxona / hammom soni"
+        help_text="Sanuzellar soni"
     )
     maydon_m2 = models.FloatField(blank=True, null=True)
     qavat = models.PositiveSmallIntegerField(blank=True, null=True)
