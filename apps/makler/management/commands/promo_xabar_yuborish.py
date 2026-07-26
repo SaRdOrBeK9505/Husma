@@ -68,7 +68,7 @@ def _obunalar_tugmasi():
         "inline_keyboard": [
             [
                 {
-                    "text": "📦 Obunani faollashtirish",
+                    "text": "📦 Obunalar sahifasiga o'tish",
                     "web_app": {"url": final_url},
                 }
             ]
