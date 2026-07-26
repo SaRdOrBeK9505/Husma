@@ -151,16 +151,17 @@ def obuna_promo_xabar(rieltor) -> bool:
         return False
 
     matn = _obuna_promo_matni()
+    tugma = _obunalar_tugmasi()
 
-    # Tugma hozircha olib qo'yildi — faqat rasm + matn yuboriladi.
+    # Rasm mavjud bo'lsa — rasm + caption + tugma, aks holda matn + tugma.
     if Path(PROMO_OBUNA_RASM).is_file():
         yuborildi = telegram_rasm_yuborish(
-            tg_id, str(PROMO_OBUNA_RASM), caption=matn
+            tg_id, str(PROMO_OBUNA_RASM), caption=matn, reply_markup=tugma
         )
         if yuborildi:
             return True
         # Rasm yuborilmasa (masalan API xatosi) — matnli fallback
-    return telegram_xabar_yuborish(tg_id, matn)
+    return telegram_xabar_yuborish(tg_id, matn, reply_markup=tugma)
 
 
 def bepul_muddat_tugadi_xabar(rieltor):
