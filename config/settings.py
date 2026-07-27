@@ -360,6 +360,12 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# ===== BEPUL SINOV DAVRI KVARTIRA LIMITI =====
+# Rieltor bepul 7 kunlik sinov davrida joylashtira oladigan kvartiralar soni.
+# Faol obuna sotib olgandan so'ng limit o'chiriladi (cheksiz).
+# Bu qiymatni .env orqali ham boshqarish mumkin.
+BEPUL_KVARTIRA_LIMIT = int(os.getenv('BEPUL_KVARTIRA_LIMIT', '3'))
+
 # ===== LOGGING — Telegram auth request diagnostikasi =====
 # 'telegram_auth' logger barcha kelgan request body / header larni
 # logs/telegram_auth.log fayliga va konsolga yozadi.

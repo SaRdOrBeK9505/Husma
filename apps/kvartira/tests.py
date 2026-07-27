@@ -550,3 +550,92 @@ class KvartiraValidationTests(KvartiraBaseTestCase):
         kv = Kvartira.objects.get(pk=resp.data['id'])
         # Client yuborgan False e'tiborsiz qoldirilib, server True qo'ygan
         self.assertTrue(kv.is_verified)
+
+
+# ============================================================
+# 6. BEPUL DAVR KVARTIRA LIMITI testlari
+# ============================================================
+class KvartiraBepulLimitTests(KvartiraBaseTestCase):
+    """Bepul sinov davrida max 3 ta kvartira; obuna bilan cheksiz."""
+    url = '/api/rieltor/kvartiralar/'
+
+    def test_bepul_davrda_3_ta_joylashadi(self):
+        """Bepul davrdagi rieltor 3 ta kvartira qo'sha oladi → 201."""
+        self.auth(self.rieltor_a)
+        for i in range(3):
+            resp = self.client.post(
+                self.url,
+                self.valid_payload(sarlavha=f'Kvartira {i+1}'),
+                format='json'
+            )
+            self.assertEqual(
+                resp.status_code, status.HTTP_201_CREATED,
+                msg=f"{i+1}-kvartira qo'shilmadi: {resp.data}"
+            )
+        self.assertEqual(
+            Kvartira.objects.filter(qoshgan=self.rieltor_a).count(), 3
+        )
+
+    def test_bepul_davrda_4_ta_rad_etiladi(self):
+        """Bepul davrdagi rieltor 4-kvartirani qo'sha olmaydi → 403."""
+        self.auth(self.rieltor_a)
+        for i in range(3):
+            self.client.post(
+                self.url,
+                self.valid_payload(sarlavha=f'Kvartira {i+1}'),
+                format='json'
+            )
+        # 4-kvartira
+        resp = self.client.post(
+            self.url,
+            self.valid_payload(sarlavha='4-kvartira'),
+            format='json'
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn('obuna_kerak', resp.data)
+        self.assertTrue(resp.data['obuna_kerak'])
+        self.assertEqual(resp.data['limit'], 3)
+        self.assertEqual(resp.data['jami_kvartiralar'], 3)
+
+    def test_obunali_rieltor_limitdan_ortiq_qoshadi(self):
+        """Faol obunasi bor rieltor 3 tadan ko'p kvartira qo'sha oladi → 201."""
+        from apps.obuna.models import Tarif, Obuna
+        from django.utils import timezone
+        from datetime import timedelta
+
+        # Tarif va faol obuna yaratamiz
+        tarif = Tarif.objects.create(
+            nomi='Test oylik', kod='test-oylik', narx=100000, davomiylik_kun=30
+        )
+        obuna = Obuna.objects.create(
+            rieltor=self.profil_a,
+            tarif=tarif,
+            narx=tarif.narx,
+            holat=Obuna.Holat.FAOL,
+            boshlanish_vaqti=timezone.now(),
+            tugash_vaqti=timezone.now() + timedelta(days=30),
+        )
+
+        self.auth(self.rieltor_a)
+        for i in range(5):
+            resp = self.client.post(
+                self.url,
+                self.valid_payload(sarlavha=f'Obuna kvartira {i+1}'),
+                format='json'
+            )
+            self.assertEqual(
+                resp.status_code, status.HTTP_201_CREATED,
+                msg=f"Obunali rieltor {i+1}-kvartirani qo'sha olmadi: {resp.data}"
+            )
+
+    def test_bepul_limit_xabar_mazmuni(self):
+        """403 javobda error xabari va kerakli maydonlar to'g'ri qaytadi."""
+        self.auth(self.rieltor_a)
+        for i in range(3):
+            self.client.post(
+                self.url, self.valid_payload(sarlavha=f'K{i}'), format='json'
+            )
+        resp = self.client.post(self.url, self.valid_payload(), format='json')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn('error', resp.data)
+        self.assertIn('3', resp.data['error'])  # "3 ta" deb eslatilgan bo'lishi kerak

@@ -14,7 +14,7 @@ from drf_spectacular.utils import extend_schema
 
 from rest_framework.pagination import PageNumberPagination
 
-from core.permissions import IsAdminOrActiveRieltor
+from core.permissions import IsAdminOrActiveRieltor, bepul_kvartira_limiti_tekshir
 from .models import Kvartira, KvartiraRasm, KvartiraPlanirovka
 from .filters import KvartiraFilter
 
@@ -129,6 +129,22 @@ class RieltorKvartiraListCreateView(ListCreateAPIView):
         tags=["Kvartira - Rieltor"],
     )
     def post(self, request, *args, **kwargs):
+        # Admin uchun limit tekshiruvi o'tkazib yuboriladi
+        if request.user.role != 'admin':
+            profil = getattr(request.user, 'rieltor_profil', None)
+            if profil is not None:
+                limit_natija = bepul_kvartira_limiti_tekshir(profil)
+                if not limit_natija['ruxsat']:
+                    return Response(
+                        {
+                            'error': limit_natija['xabar'],
+                            'jami_kvartiralar': limit_natija['jami'],
+                            'limit': limit_natija['limit'],
+                            'obuna_kerak': True,
+                        },
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         # Telegram username/id ni rieltor profilidan avtomatik olamiz (background)

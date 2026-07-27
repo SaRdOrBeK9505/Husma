@@ -194,7 +194,9 @@ def _xabar_matni_tayorla(ariza_makler: ArizaMakler) -> str:
     
     # Ism (agar mavjud bo'lsa)
     ism_qatori = f"👤 Ism: {ariza.ism}\n" if ariza.ism else ""
-    
+    # Qo'shimcha izoh (agar mavjud bo'lsa)
+    izoh_qatori = f"📝 Izoh: {ariza.qoshimcha_izoh}\n" if ariza.qoshimcha_izoh else ""
+
     matn = (
         f"🔔 *Mijozdan yangi ariza tushdi!*\n\n"
         f"🎯 Maqsad: {ariza_turi}\n"
@@ -204,6 +206,7 @@ def _xabar_matni_tayorla(ariza_makler: ArizaMakler) -> str:
         f"💰 Narx: {narx}\n"
         f"{ism_qatori}"
         f"📞 Tel: {telefon_str}\n"
+        f"{izoh_qatori}"
     )
     
     return matn
@@ -293,7 +296,9 @@ def kanalga_yangi_ariza_xabari_yubor(self, ariza_id: int) -> dict:
         
         # Ism (agar mavjud bo'lsa)
         ism_qatori = f"👤 Ism: {ariza.ism}\n" if ariza.ism else ""
-        
+        # Qo'shimcha izoh (agar mavjud bo'lsa)
+        izoh_qatori = f"📝 Izoh: {ariza.qoshimcha_izoh}\n" if ariza.qoshimcha_izoh else ""
+
         xabar_matni = (
             f"📋 *Mijozdan yangi ariza tushdi!*\n\n"
             f"🎯 Maqsad: {ariza_turi}\n"
@@ -303,6 +308,7 @@ def kanalga_yangi_ariza_xabari_yubor(self, ariza_id: int) -> dict:
             f"💰 Narx: {narx}\n"
             f"{ism_qatori}"
             f"📞 Tel: {telefon_str}\n"
+            f"{izoh_qatori}"
         )
         
         # Kanalga yuborish - ARIZA kanali

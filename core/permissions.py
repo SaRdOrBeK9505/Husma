@@ -1,4 +1,51 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
+from django.conf import settings
+
+
+def bepul_kvartira_limiti_tekshir(profil) -> dict:
+    """
+    Rieltorning kvartira joylashtirish limitini tekshiradi.
+
+    Qoidalar:
+    - Faol **obunasi** bor rieltor → cheksiz, limit yo'q.
+    - Faqat **bepul sinov** davrida ishlayotgan rieltor →
+      jami qo'shilgan kvartiralari ``BEPUL_KVARTIRA_LIMIT`` dan oshmasligi kerak.
+
+    Returns:
+        {
+            "ruxsat": bool,           # True → joylashtirish mumkin
+            "limit_faol": bool,       # True → bepul davr limiti ishlamoqda
+            "jami": int,              # Hozirgi kvartiralar soni
+            "limit": int,             # Ruxsat etilgan maksimal son
+            "xabar": str,             # Foydalanuvchiga ko'rsatiladigan xabar (xato bo'lsa)
+        }
+    """
+    limit = getattr(settings, 'BEPUL_KVARTIRA_LIMIT', 3)
+
+    # Faol obuna bor → cheksiz
+    if profil.obuna_faol:
+        return {
+            "ruxsat": True,
+            "limit_faol": False,
+            "jami": 0,
+            "limit": limit,
+            "xabar": "",
+        }
+
+    # Bepul sinov davri — limitni tekshiramiz
+    jami = profil.user.kvartiralar.count()
+    ruxsat = jami < limit
+
+    return {
+        "ruxsat": ruxsat,
+        "limit_faol": True,
+        "jami": jami,
+        "limit": limit,
+        "xabar": (
+            f"Bepul sinov davrida faqat {limit} ta kvartira joylashtirish mumkin. "
+            f"Cheksiz joylashtirish uchun obuna oling."
+        ) if not ruxsat else "",
+    }
 
 
 class IsAdmin(BasePermission):
