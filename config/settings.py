@@ -380,6 +380,11 @@ LOGGING = {
             'format': '{asctime} [{levelname}] {message}',
             'style': '{',
         },
+        # Xato loglari uchun to'liqroq format: modul nomi ham ko'rinadi
+        'error_format': {
+            'format': '{asctime} [{levelname}] {name} — {message}',
+            'style': '{',
+        },
     },
     'handlers': {
         'console': {
@@ -392,11 +397,31 @@ LOGGING = {
             'encoding': 'utf-8',
             'formatter': 'verbose',
         },
+        # ERROR darajadagi barcha loglarni errors.log ga yozadi
+        'error_file': {
+            'class': 'logging.FileHandler',
+            'filename': str(LOGS_DIR / 'errors.log'),
+            'encoding': 'utf-8',
+            'level': 'ERROR',
+            'formatter': 'error_format',
+        },
     },
     'loggers': {
         'telegram_auth': {
             'handlers': ['console', 'telegram_auth_file'],
             'level': 'INFO',
+            'propagate': False,
+        },
+        # Django o'zining ichki xatolarini (500, DB, template va h.k.) errors.log ga yozadi
+        'django': {
+            'handlers': ['console', 'error_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        # Barcha apps.* loggerlar (apps.kvartira, apps.ariza va h.k.) errors.log ga yozadi
+        'apps': {
+            'handlers': ['console', 'error_file'],
+            'level': 'ERROR',
             'propagate': False,
         },
     },

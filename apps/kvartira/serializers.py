@@ -3,6 +3,7 @@ from io import BytesIO
 
 from rest_framework import serializers
 from django.core.files.base import ContentFile
+from django.db import transaction
 from PIL import Image, ImageOps
 
 from .models import Kvartira, KvartiraRasm, KvartiraPlanirovka
@@ -321,17 +322,21 @@ class KvartiraYaratishSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         rasmlar = validated_data.pop('rasmlar', [])
         planirovkalar = validated_data.pop('planirovkalar', [])
-        kvartira = Kvartira.objects.create(**validated_data)
 
-        for i, rasm in enumerate(rasmlar):
-            KvartiraRasm.objects.create(
-                kvartira=kvartira, rasm=heic_ni_jpegga_aylantir(rasm),
-                asosiy=(i == 0), tartib=i
-            )
-        for rasm in planirovkalar:
-            KvartiraPlanirovka.objects.create(
-                kvartira=kvartira, rasm=heic_ni_jpegga_aylantir(rasm)
-            )
+        # transaction.atomic() — kvartira yoki rasmdan biri saqlanmasa,
+        # butun operatsiya bekor qilinadi (chala yozuv DB'da qolmaydi)
+        with transaction.atomic():
+            kvartira = Kvartira.objects.create(**validated_data)
+
+            for i, rasm in enumerate(rasmlar):
+                KvartiraRasm.objects.create(
+                    kvartira=kvartira, rasm=heic_ni_jpegga_aylantir(rasm),
+                    asosiy=(i == 0), tartib=i
+                )
+            for rasm in planirovkalar:
+                KvartiraPlanirovka.objects.create(
+                    kvartira=kvartira, rasm=heic_ni_jpegga_aylantir(rasm)
+                )
         return kvartira
 
     def update(self, instance, validated_data):
@@ -341,24 +346,27 @@ class KvartiraYaratishSerializer(serializers.ModelSerializer):
         if rasmlar:
             self._rasm_limitini_tekshir(instance, rasmlar)
 
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
+        # transaction.atomic() — maydon yangilanishi yoki rasm saqlashda xato
+        # bo'lsa, qisman o'zgarishlar orqaga qaytariladi
+        with transaction.atomic():
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
 
-        if rasmlar:
-            mavjud = instance.rasmlar.count()
-            bosh_rasm_bormi = instance.rasmlar.filter(asosiy=True).exists()
-            for i, rasm in enumerate(rasmlar):
-                KvartiraRasm.objects.create(
-                    kvartira=instance, rasm=heic_ni_jpegga_aylantir(rasm),
-                    asosiy=(not bosh_rasm_bormi and i == 0),
-                    tartib=mavjud + i
-                )
-        if planirovkalar:
-            for rasm in planirovkalar:
-                KvartiraPlanirovka.objects.create(
-                    kvartira=instance, rasm=heic_ni_jpegga_aylantir(rasm)
-                )
+            if rasmlar:
+                mavjud = instance.rasmlar.count()
+                bosh_rasm_bormi = instance.rasmlar.filter(asosiy=True).exists()
+                for i, rasm in enumerate(rasmlar):
+                    KvartiraRasm.objects.create(
+                        kvartira=instance, rasm=heic_ni_jpegga_aylantir(rasm),
+                        asosiy=(not bosh_rasm_bormi and i == 0),
+                        tartib=mavjud + i
+                    )
+            if planirovkalar:
+                for rasm in planirovkalar:
+                    KvartiraPlanirovka.objects.create(
+                        kvartira=instance, rasm=heic_ni_jpegga_aylantir(rasm)
+                    )
         return instance
 
 

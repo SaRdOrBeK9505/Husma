@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
 from drf_spectacular.utils import extend_schema
@@ -263,13 +264,16 @@ class RieltorKvartiraRasmView(APIView):
 
         bosh_rasm_bormi = kvartira.rasmlar.filter(asosiy=True).exists()
         yaratilgan = []
-        for i, rasm in enumerate(yangi_rasmlar):
-            obj = KvartiraRasm.objects.create(
-                kvartira=kvartira, rasm=heic_ni_jpegga_aylantir(rasm),
-                asosiy=(not bosh_rasm_bormi and i == 0),
-                tartib=mavjud + i
-            )
-            yaratilgan.append(obj)
+        # transaction.atomic() — bir nechta rasm saqlashda xato bo'lsa,
+        # chala yuklangan rasmlar DB'da qolmaydi
+        with transaction.atomic():
+            for i, rasm in enumerate(yangi_rasmlar):
+                obj = KvartiraRasm.objects.create(
+                    kvartira=kvartira, rasm=heic_ni_jpegga_aylantir(rasm),
+                    asosiy=(not bosh_rasm_bormi and i == 0),
+                    tartib=mavjud + i
+                )
+                yaratilgan.append(obj)
         return Response(
             KvartiraRasmSerializer(yaratilgan, many=True).data,
             status=status.HTTP_201_CREATED
