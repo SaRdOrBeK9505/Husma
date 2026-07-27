@@ -20,6 +20,10 @@ class Ariza(models.Model):
         KORILMOQDA = 'korilmoqda', 'Ko\'rilmoqda'
         YOPILGAN = 'yopilgan', 'Yopilgan'
 
+    class Valyuta(models.TextChoices):
+        UZS = 'UZS', 'so\'m'
+        USD = 'USD', '$ (dollar)'
+
     user = models.ForeignKey(
         CustomUser,
         on_delete=models.CASCADE,
@@ -56,6 +60,12 @@ class Ariza(models.Model):
     )
     narx_min = models.BigIntegerField()
     narx_max = models.BigIntegerField()
+    valyuta = models.CharField(
+        max_length=3,
+        choices=Valyuta.choices,
+        default=Valyuta.UZS,
+        help_text="Narx valyutasi — so'm yoki $"
+    )
     telefon = models.CharField(max_length=20, blank=True, null=True)
     qoshimcha_izoh = models.TextField(blank=True, null=True)
     holat = models.CharField(

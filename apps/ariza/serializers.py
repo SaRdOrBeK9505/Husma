@@ -35,7 +35,7 @@ class ArizaYaratishSerializer(serializers.ModelSerializer):
         model = Ariza
         fields = [
             'id', 'mulk_turi', 'viloyat', 'hudud', 'ariza_turi', 'xonalar_soni',
-            'narx_min', 'narx_max', 'telefon', 'ism', 'qoshimcha_izoh',
+            'narx_min', 'narx_max', 'valyuta', 'telefon', 'ism', 'qoshimcha_izoh',
         ]
 
     def validate(self, data):
@@ -60,6 +60,9 @@ class ArizaSerializer(serializers.ModelSerializer):
     holat_display = serializers.CharField(
         source='get_holat_display', read_only=True
     )
+    valyuta_display = serializers.CharField(
+        source='get_valyuta_display', read_only=True
+    )
 
     class Meta:
         model = Ariza
@@ -67,7 +70,8 @@ class ArizaSerializer(serializers.ModelSerializer):
             'id', 'mulk_turi', 'viloyat', 'viloyat_nomi', 'hudud',
             'ariza_turi', 'ariza_turi_display',
             'xonalar_soni', 'xonalar_soni_display',
-            'narx_min', 'narx_max', 'telefon', 'ism',
+            'narx_min', 'narx_max', 'valyuta', 'valyuta_display',
+            'telefon', 'ism',
             'qoshimcha_izoh', 'holat', 'holat_display',
             'created_at',
         ]
@@ -93,7 +97,7 @@ class MaklerArizaSerializer(serializers.ModelSerializer):
             'id', 'user_full_name', 'mulk_turi', 'viloyat', 'viloyat_nomi', 'hudud',
             'ariza_turi', 'ariza_turi_display',
             'xonalar_soni', 'xonalar_soni_display',
-            'narx_min', 'narx_max', 'telefon', 'ism',
+            'narx_min', 'narx_max', 'valyuta', 'telefon', 'ism',
             'qoshimcha_izoh', 'holat', 'created_at', 'vaqt_oldin',
         ]
 

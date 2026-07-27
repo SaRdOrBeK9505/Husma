@@ -181,7 +181,8 @@ def _xabar_matni_tayorla(ariza_makler: ArizaMakler) -> str:
     ariza = ariza_makler.ariza
     mulk_turi = ariza.mulk_turi.nomi if ariza.mulk_turi else "Noma'lum"
     hudud = ariza.hudud.nomi if ariza.hudud else "Noma'lum"
-    narx = f"{ariza.narx_min:,} - {ariza.narx_max:,} so'm"
+    valyuta = ariza.get_valyuta_display()
+    narx = f"{ariza.narx_min:,} - {ariza.narx_max:,} {valyuta}"
     # Telefonni dialer ochiladigan toza formatda ko'rsatamiz
     telefon_str = _telefon_tozala(ariza.telefon) or "Ko'rsatilmagan"
     
@@ -280,7 +281,8 @@ def kanalga_yangi_ariza_xabari_yubor(self, ariza_id: int) -> dict:
         # Xabar matnini tayyorlash
         mulk_turi = ariza.mulk_turi.nomi if ariza.mulk_turi else "Noma'lum"
         hudud = ariza.hudud.nomi if ariza.hudud else "Noma'lum"
-        narx = f"{ariza.narx_min:,} - {ariza.narx_max:,} so'm"
+        valyuta = ariza.get_valyuta_display()
+        narx = f"{ariza.narx_min:,} - {ariza.narx_max:,} {valyuta}"
         telefon_str = _telefon_tozala(ariza.telefon) or "Ko'rsatilmagan"
         
         # Ariza turi (maqsad) - ijaraga olish yoki sotib olish
