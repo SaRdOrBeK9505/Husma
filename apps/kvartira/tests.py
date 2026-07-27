@@ -431,6 +431,54 @@ class KvartiraRasmTests(KvartiraBaseTestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_octet_stream_with_jpg_extension_accepted(self):
+        """content_type="application/octet-stream" lekin kengaytma ".jpg" bo'lsa
+        validatsiya MUVAFFAQIYATLI o'tishi kerak.
+
+        Ba'zi iPhone/Safari brauzerlar HEIC yoki JPEG faylni noto'g'ri
+        "application/octet-stream" content_type bilan yuboradi. Kengaytma
+        to'g'ri bo'lgani uchun fayl rad etilmasligi kerak.
+        """
+        from apps.kvartira.serializers import rasm_faylini_tekshir
+
+        fayl = make_image('foto.jpg', content_type='application/octet-stream')
+        # ValidationError ko'tarilmasligi kerak
+        try:
+            rasm_faylini_tekshir(fayl)
+        except Exception as e:
+            self.fail(
+                f"To'g'ri kengaytmali fayl noto'g'ri content_type bilan rad etildi: {e}"
+            )
+
+    def test_octet_stream_with_heic_extension_accepted(self):
+        """content_type="application/octet-stream" lekin kengaytma ".heic" → qabul."""
+        from apps.kvartira.serializers import rasm_faylini_tekshir
+
+        fayl = SimpleUploadedFile('foto.heic', b'fake-heic-data', content_type='application/octet-stream')
+        try:
+            rasm_faylini_tekshir(fayl)
+        except Exception as e:
+            self.fail(f"HEIC kengaytmali fayl noto'g'ri content_type bilan rad etildi: {e}")
+
+    def test_wrong_mime_and_wrong_extension_rejected(self):
+        """content_type ham noto'g'ri, kengaytma ham noto'g'ri → rad etiladi."""
+        from apps.kvartira.serializers import rasm_faylini_tekshir
+        from rest_framework.exceptions import ValidationError
+
+        fayl = SimpleUploadedFile('hujjat.pdf', b'%PDF-1.4', content_type='application/pdf')
+        with self.assertRaises(ValidationError):
+            rasm_faylini_tekshir(fayl)
+
+    def test_correct_mime_no_extension_accepted(self):
+        """content_type to'g'ri lekin kengaytma yo'q → qabul qilinadi."""
+        from apps.kvartira.serializers import rasm_faylini_tekshir
+
+        fayl = SimpleUploadedFile('rasm', b'data', content_type='image/jpeg')
+        try:
+            rasm_faylini_tekshir(fayl)
+        except Exception as e:
+            self.fail(f"To'g'ri MIME turli fayl rad etildi: {e}")
+
 
 # ============================================================
 # 5. MA'LUMOT VALIDATSIYASI

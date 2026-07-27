@@ -68,21 +68,21 @@ def rasm_faylini_tekshir(fayl):
             f"Ruxsat etilgan maksimal hajm — {MAX_RASM_HAJMI_MB} MB."
         )
 
-    # 2. MIME turi (content_type) yoki kengaytma
+    # 2. MIME turi (content_type) va/yoki kengaytma tekshiruvi.
+    # Ba'zi qurilmalar/brauzerlar (asosan iPhone/Safari) to'g'ri formatdagi
+    # faylni noto'g'ri MIME turi (masalan "application/octet-stream") bilan
+    # yuborishi mumkin. Shuning uchun KAMIDA BITTASI to'g'ri bo'lsa qabul
+    # qilinadi: content_type YOKI fayl kengaytmasi.
     content_type = getattr(fayl, 'content_type', None)
     nomi = (getattr(fayl, 'name', '') or '').lower()
     kengaytma_ok = nomi.endswith(RUXSAT_KENGAYTMALAR)
+    mime_ok = content_type in RUXSAT_MIME_TURLARI if content_type else False
 
-    if content_type is not None:
-        if content_type not in RUXSAT_MIME_TURLARI:
-            raise serializers.ValidationError(
-                f"Rasm formati qo'llab-quvvatlanmaydi ({content_type}). "
-                f"Faqat JPEG, PNG yoki WEBP yuklash mumkin."
-            )
-    elif nomi and not kengaytma_ok:
+    if not mime_ok and not kengaytma_ok:
         raise serializers.ValidationError(
-            "Rasm formati qo'llab-quvvatlanmaydi. "
-            "Faqat JPEG, PNG yoki WEBP yuklash mumkin."
+            f"Rasm formati qo'llab-quvvatlanmaydi"
+            f"{f' ({content_type})' if content_type else ''}. "
+            f"Faqat JPEG, PNG, WEBP yoki HEIC/HEIF (iPhone) yuklash mumkin."
         )
 
     return fayl
