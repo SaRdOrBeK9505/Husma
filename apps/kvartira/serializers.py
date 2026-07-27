@@ -1,3 +1,4 @@
+import logging
 from io import BytesIO
 
 from rest_framework import serializers
@@ -7,6 +8,8 @@ from PIL import Image, ImageOps
 from .models import Kvartira, KvartiraRasm, KvartiraPlanirovka
 from apps.hudud.models import Viloyat, Hudud
 
+logger = logging.getLogger(__name__)
+
 # --- HEIC/HEIF (iPhone rasmlari) qo'llab-quvvatlash ---
 # pillow-heif kutubxonasi o'rnatilgan bo'lsa, Pillow HEIC faylini ham o'qiy
 # oladi. O'rnatilmagan bo'lsa — app ishlashda davom etadi (faqat HEIC qabul
@@ -15,8 +18,9 @@ try:
     from pillow_heif import register_heif_opener
     register_heif_opener()
     HEIC_QOLLAB_QUVVATLANADI = True
-except Exception:  # pragma: no cover - kutubxona yo'q bo'lsa
+except Exception as e:  # pragma: no cover - kutubxona yo'q bo'lsa
     HEIC_QOLLAB_QUVVATLANADI = False
+    logger.error(f"pillow-heif yuklanmadi: {e}")
 
 # Bitta e'longa ruxsat etilgan maksimal rasm soni (owner talabi: 8 tagacha)
 MAX_RASM_SONI = 8
@@ -128,24 +132,37 @@ def heic_ni_jpegga_aylantir(fayl):
       rasmlari yon tomonga ag'darilib saqlanadi.
     - pillow-heif o'rnatilmagan bo'lsa (HEIC_QOLLAB_QUVVATLANADI=False) —
       fayl o'zgarishsiz qaytariladi (bunda ImageField uni rad etadi).
-    """
-    if not _heic_faylmi(fayl) or not HEIC_QOLLAB_QUVVATLANADI:
-        return fayl
 
-    # Faylni boshidan o'qishga tayyorlaymiz
+    KRITIK — fayl pozitsiyasi:
+    Ko'p rasm bir so'rovda kelganda (masalan 3 ta) birinchi
+    KvartiraRasm.objects.create() da S3Boto3Storage fayl.read() chaqiradi.
+    Bu fayl pozitsiyasini oxiriga olib boradi. Agar HEIC BO'LMAGAN fayllar
+    uchun seek(0) chaqirilmasa, 2-chi va 3-chi rasmlar S3'ga 0 bayt (bo'sh)
+    yuboriladi. Shuning uchun HAR DOIM seek(0) chaqiramiz.
+    """
+    # Faylni boshidan o'qishga tayyorlaymiz — HEIC va non-HEIC uchun ham
     if hasattr(fayl, 'seek'):
         fayl.seek(0)
 
-    rasm = Image.open(fayl)
-    # EXIF orientation'ni to'g'rilash (iPhone rasmlari uchun kritik)
-    rasm = ImageOps.exif_transpose(rasm)
-    rasm = rasm.convert('RGB')
+    if not _heic_faylmi(fayl) or not HEIC_QOLLAB_QUVVATLANADI:
+        return fayl
 
-    buffer = BytesIO()
-    rasm.save(buffer, format='JPEG', quality=85, optimize=True)
+    try:
+        rasm = Image.open(fayl)
+        # EXIF orientation'ni to'g'rilash (iPhone rasmlari uchun kritik)
+        rasm = ImageOps.exif_transpose(rasm)
+        rasm = rasm.convert('RGB')
 
-    asl_nomi = (getattr(fayl, 'name', '') or 'rasm').rsplit('.', 1)[0]
-    return ContentFile(buffer.getvalue(), name=f"{asl_nomi}.jpg")
+        buffer = BytesIO()
+        rasm.save(buffer, format='JPEG', quality=85, optimize=True)
+
+        asl_nomi = (getattr(fayl, 'name', '') or 'rasm').rsplit('.', 1)[0]
+        return ContentFile(buffer.getvalue(), name=f"{asl_nomi}.jpg")
+    except Exception as e:
+        logger.error(f"HEIC konvertatsiya xatosi ({getattr(fayl, 'name', '?')}): {e}")
+        raise serializers.ValidationError(
+            f"'{getattr(fayl, 'name', 'rasm')}' faylini qayta ishlab bo'lmadi."
+        )
 
 
 class KvartiraRasmSerializer(serializers.ModelSerializer):

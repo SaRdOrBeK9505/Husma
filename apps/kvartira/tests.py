@@ -3,14 +3,24 @@ Kvartira API endpoint'lari uchun to'liq test to'plami.
 
 Fokus:
   1. PERMISSION (ruxsat) testlari  — eng muhim qism
-  2. Rasm upload testlari
+  2. Rasm upload testlari — ko'p rasm bir so'rovda yuborish (3+ ta)
   3. Ma'lumot validatsiyasi
+  4. Storage / fayl joylashuv testlari
 
 Ishga tushirish (sqlite bilan tez test):
     set DB_ENGINE=sqlite && python manage.py test apps.kvartira -v 2
 
 Rasm testlari DigitalOcean'ga yuklamasligi uchun STORAGES in-memory'ga
 override qilingan.
+
+MUHIM XATOLAR va TUZATISHLAR haqida:
+  - Bitta so'rovda 3+ rasm yuklaganda 3-rasmdagi muammo:
+    heic_ni_jpegga_aylantir() HEIC bo'lmagan faylni o'zgarishsiz qaytaradi,
+    lekin SimpleUploadedFile ob'ektining fayl pozitsiyasi birinchi
+    KvartiraRasm.objects.create() da o'qilgandan keyin oxirida qoladi.
+    Natijada 2-chi va 3-chi rasmlar uchun storage'ga bo'sh fayl saqlanadi.
+    Tuzatish: heic_ni_jpegga_aylantir() da HEIC BO'LMAGAN fayllar uchun
+    ham seek(0) chaqirilishi kerak.
 """
 from io import BytesIO
 
@@ -51,6 +61,22 @@ def make_image(name='test.jpg', size_kb=None, fmt='JPEG', content_type='image/jp
         # Fayl hajmini sun'iy ravishda oshirish (katta fayl testi uchun)
         data = data + (b'\x00' * (size_kb * 1024))
     return SimpleUploadedFile(name, data, content_type=content_type)
+
+
+def make_multipart_images(count, base_name='rasm', fmt='JPEG', content_type='image/jpeg'):
+    """
+    Bir so'rovda yuborish uchun count ta rasm ro'yxatini yaratadi.
+    Har bir rasm MUSTAQIL BytesIO — bir-birining pozitsiyasiga ta'sir qilmaydi.
+    """
+    result = []
+    for i in range(count):
+        buf = BytesIO()
+        # Har bir rasm biroz farqli piksel ega (bir xil cache bo'lmasligi uchun)
+        Image.new('RGB', (20 + i, 20 + i), (i * 30 % 255, 100, 200)).save(buf, format=fmt)
+        result.append(
+            SimpleUploadedFile(f'{base_name}_{i}.jpg', buf.getvalue(), content_type=content_type)
+        )
+    return result
 
 
 def make_fake_pdf(name='hujjat.pdf'):
@@ -314,15 +340,81 @@ class KvartiraRasmTests(KvartiraBaseTestCase):
         self.kv_a = self.create_kvartira(self.rieltor_a)
         self.rasm_url = f'/api/rieltor/kvartiralar/{self.kv_a.pk}/rasmlar/'
 
-    def test_create_with_1_to_8_images(self):
-        """Yaratishda 8 tagacha rasm → 201."""
+    def test_create_with_1_image(self):
+        """Yaratishda 1 ta rasm → 201 va DB'da 1 ta rasm bor."""
         self.auth(self.rieltor_a)
         payload = self.valid_payload()
-        payload['rasmlar'] = [make_image(f'r{i}.jpg') for i in range(8)]
+        payload['rasmlar'] = make_multipart_images(1)
         resp = self.client.post('/api/rieltor/kvartiralar/', payload, format='multipart')
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         kv = Kvartira.objects.get(pk=resp.data['id'])
-        self.assertEqual(kv.rasmlar.count(), 8)
+        self.assertEqual(kv.rasmlar.count(), 1)
+
+    def test_create_with_2_images(self):
+        """Yaratishda 2 ta rasm → 201 va DB'da 2 ta rasm bor."""
+        self.auth(self.rieltor_a)
+        payload = self.valid_payload()
+        payload['rasmlar'] = make_multipart_images(2)
+        resp = self.client.post('/api/rieltor/kvartiralar/', payload, format='multipart')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        kv = Kvartira.objects.get(pk=resp.data['id'])
+        self.assertEqual(kv.rasmlar.count(), 2,
+            msg="2 ta rasm yuklanganda DB'da 2 ta bo'lishi kerak edi")
+
+    def test_create_with_3_images(self):
+        """
+        Yaratishda 3 ta rasm → 201 va DB'da aniq 3 ta rasm bor.
+
+        BUG: heic_ni_jpegga_aylantir() HEIC BO'LMAGAN faylni o'zgarishsiz
+        qaytaradi, lekin SimpleUploadedFile ob'ektining fayl o'qish pozitsiyasi
+        birinchi KvartiraRasm.objects.create() chaqiruvida o'qilib bo'lgandan
+        keyin oxirida qoladi. Natijada 2-chi, 3-chi rasm uchun storage'ga
+        bo'sh kontent yoziladi.
+
+        Agar bu test MUVAFFAQIYATSIZ bo'lsa (rasmlar.count() == 1 yoki 2),
+        muammo serializers.py'dagi create() metodida: HEIC bo'lmagan
+        fayllar uchun seek(0) chaqirilmayapti.
+
+        Tuzatish: heic_ni_jpegga_aylantir() return fayl.seek(0) yoki
+        create() loopida har fayl uchun fayl.seek(0) chaqirish.
+        """
+        self.auth(self.rieltor_a)
+        payload = self.valid_payload()
+        payload['rasmlar'] = make_multipart_images(3)
+        resp = self.client.post('/api/rieltor/kvartiralar/', payload, format='multipart')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED,
+            msg=f"3 ta rasm bilan yaratish 201 qaytarishi kerak edi. Javob: {resp.data}")
+        kv = Kvartira.objects.get(pk=resp.data['id'])
+        self.assertEqual(
+            kv.rasmlar.count(), 3,
+            msg=(
+                f"DB'da {kv.rasmlar.count()} ta rasm bor, 3 ta bo'lishi kerak edi. "
+                "SABAB: heic_ni_jpegga_aylantir() HEIC bo'lmagan fayllar uchun "
+                "fayl pozitsiyasini (seek) tiklamas — 2-3-chi rasmlar bo'sh saqlanadi."
+            )
+        )
+
+    def test_create_with_4_images(self):
+        """4 ta rasm bir so'rovda → DB'da aniq 4 ta bo'lishi kerak."""
+        self.auth(self.rieltor_a)
+        payload = self.valid_payload()
+        payload['rasmlar'] = make_multipart_images(4)
+        resp = self.client.post('/api/rieltor/kvartiralar/', payload, format='multipart')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        kv = Kvartira.objects.get(pk=resp.data['id'])
+        self.assertEqual(kv.rasmlar.count(), 4,
+            msg=f"4 ta rasm yuklanganda DB'da 4 ta bo'lishi kerak edi, bor: {kv.rasmlar.count()}")
+
+    def test_create_with_1_to_8_images(self):
+        """Yaratishda 8 tagacha rasm → 201 va DB'da aniq 8 ta rasm bor."""
+        self.auth(self.rieltor_a)
+        payload = self.valid_payload()
+        payload['rasmlar'] = make_multipart_images(8)
+        resp = self.client.post('/api/rieltor/kvartiralar/', payload, format='multipart')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        kv = Kvartira.objects.get(pk=resp.data['id'])
+        self.assertEqual(kv.rasmlar.count(), 8,
+            msg=f"8 ta rasm yuklanganda DB'da 8 ta bo'lishi kerak edi, bor: {kv.rasmlar.count()}")
 
     def test_create_with_9_images_rejected(self):
         """9 ta rasm → xatolik ('8 ta' xabari bilan)."""
@@ -353,11 +445,159 @@ class KvartiraRasmTests(KvartiraBaseTestCase):
             KvartiraRasm.objects.create(kvartira=self.kv_a, rasm=make_image(f'e{i}.jpg'))
         resp = self.client.post(
             self.rasm_url,
-            {'rasmlar': [make_image(f'n{i}.jpg') for i in range(3)]},
+            {'rasmlar': make_multipart_images(3)},
             format='multipart'
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(self.kv_a.rasmlar.count(), 8)
+
+    def test_add_3_images_all_saved_to_db(self):
+        """
+        Mavjud 0 ta kvartiraga 3 ta yangi rasm qo'shish → DB'da aniq 3 ta bor.
+
+        BUG repro: /api/rieltor/kvartiralar/<pk>/rasmlar/ POST da
+        heic_ni_jpegga_aylantir() HEIC bo'lmagan faylni o'zgarishsiz qaytaradi.
+        Agar fayl ob'ektining read() pozitsiyasi birinchi create() da oxiriga
+        borsa, keyingi create() larda bo'sh fayl saqlanadi.
+        Bu test shu muammoni to'g'ridan-to'g'ri ushlab beradi.
+        """
+        self.auth(self.rieltor_a)
+        resp = self.client.post(
+            self.rasm_url,
+            {'rasmlar': make_multipart_images(3)},
+            format='multipart'
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED,
+            msg=f"3 ta rasm qo'shishda 201 bo'lishi kerak edi. Javob: {resp.data}")
+        self.kv_a.refresh_from_db()
+        saved_count = self.kv_a.rasmlar.count()
+        self.assertEqual(
+            saved_count, 3,
+            msg=(
+                f"DB'da {saved_count} ta rasm saqlangan, 3 ta bo'lishi kerak edi. "
+                "SABAB: fayl pozitsiyasi (seek) muammosi — "
+                "views.py RieltorKvartiraRasmView.post() da "
+                "heic_ni_jpegga_aylantir() HEIC bo'lmagan faylni o'zgarishsiz "
+                "qaytaradi, lekin fayl read pozitsiyasi tiklanmaydi."
+            )
+        )
+
+    def test_add_3_images_response_count(self):
+        """3 ta rasm qo'shilganda javobdagi ro'yxatda 3 ta element bor."""
+        self.auth(self.rieltor_a)
+        resp = self.client.post(
+            self.rasm_url,
+            {'rasmlar': make_multipart_images(3)},
+            format='multipart'
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            len(resp.data), 3,
+            msg=f"Javobda {len(resp.data)} ta rasm, 3 ta bo'lishi kerak edi"
+        )
+
+    def test_seek_bug_s3_simulation(self):
+        """
+        S3Boto3Storage kabi fayl.read() chaqiradigan storage uchun
+        fayl pozitsiyasi muammosi yo'qligini tasdiqlaydi.
+
+        InMemoryStorage ichki buferni avtomatik tiklaydigan bo'lgani uchun
+        haqiqiy S3 xatti-harakatini simulyatsiya qilamiz:
+        har bir fayl uchun storage.save() vaqtida fayl.read() chaqiriladi.
+        heic_ni_jpegga_aylantir() seek(0) ni chaqirishi kerak, aks holda
+        2-chi va 3-chi rasmlar 0 bayt (bo'sh) saqlanadi.
+
+        BUG TUZATILDI: seek(0) HEIC bo'lmagan fayllar uchun ham chaqiriladi.
+        """
+        from apps.kvartira.serializers import heic_ni_jpegga_aylantir
+
+        def s3_kabi_saqlash(fayl):
+            """S3Boto3Storage._save() xatti-harakatini simulyatsiya qiladi."""
+            return fayl.read()  # seek() siz to'g'ridan-to'g'ri o'qiydi
+
+        images = make_multipart_images(3)
+        for i, fayl in enumerate(images):
+            # S3 storage faylni o'qiydi (birinchi marta)
+            tayyor_fayl = heic_ni_jpegga_aylantir(fayl)
+            kontent = s3_kabi_saqlash(tayyor_fayl)
+            self.assertGreater(
+                len(kontent), 0,
+                msg=(
+                    f"{i+1}-rasm uchun heic_ni_jpegga_aylantir() seek(0) chaqirmagani "
+                    f"sababli bo'sh kontent ({len(kontent)} bayt). "
+                    f"S3'ga 0 bayt yuboriladi!"
+                )
+            )
+
+    def test_add_images_first_image_is_main(self):
+        """
+        Hech qanday asosiy rasm yo'q bo'lganda, yangi qo'shilgan
+        rasmlarning birinchisi asosiy (asosiy=True) bo'lishi kerak.
+        """
+        self.auth(self.rieltor_a)
+        # Birorta asosiy yo'qligini tekshiramiz
+        self.assertFalse(self.kv_a.rasmlar.filter(asosiy=True).exists())
+
+        resp = self.client.post(
+            self.rasm_url,
+            {'rasmlar': make_multipart_images(3)},
+            format='multipart'
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        asosiy_rasms = self.kv_a.rasmlar.filter(asosiy=True)
+        self.assertEqual(
+            asosiy_rasms.count(), 1,
+            msg=f"Asosiy rasmlar soni {asosiy_rasms.count()} ta, 1 ta bo'lishi kerak"
+        )
+
+    def test_add_images_second_batch_not_overwrite_main(self):
+        """
+        Asosiy rasm allaqachon bor bo'lsa, keyingi batch qo'shilganda
+        yangi rasmlar asosiy EMAS deb belgilanishi kerak.
+        """
+        self.auth(self.rieltor_a)
+        # Birinchi batch — birinchisi asosiy bo'ladi
+        resp1 = self.client.post(
+            self.rasm_url,
+            {'rasmlar': make_multipart_images(2, base_name='batch1')},
+            format='multipart'
+        )
+        self.assertEqual(resp1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self.kv_a.rasmlar.filter(asosiy=True).count(), 1)
+
+        # Ikkinchi batch — asosiy o'zgarmasin
+        resp2 = self.client.post(
+            self.rasm_url,
+            {'rasmlar': make_multipart_images(2, base_name='batch2')},
+            format='multipart'
+        )
+        self.assertEqual(resp2.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            self.kv_a.rasmlar.count(), 4,
+            msg="Jami 4 ta rasm bo'lishi kerak edi"
+        )
+        self.assertEqual(
+            self.kv_a.rasmlar.filter(asosiy=True).count(), 1,
+            msg="Faqat bitta asosiy rasm bo'lishi kerak (ikkinchi batch asosiyni o'zgartirmasin)"
+        )
+
+    def test_tartib_sequential_for_multiple_images(self):
+        """
+        Ko'p rasm qo'shilganda tartib raqamlari ketma-ket bo'lishi kerak.
+        Mavjud 0 rasm + 3 yangi → tartib: 0, 1, 2
+        """
+        self.auth(self.rieltor_a)
+        resp = self.client.post(
+            self.rasm_url,
+            {'rasmlar': make_multipart_images(3)},
+            format='multipart'
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        tartiblar = sorted(
+            self.kv_a.rasmlar.values_list('tartib', flat=True)
+        )
+        self.assertEqual(tartiblar, [0, 1, 2],
+            msg=f"Tartib raqamlari {tartiblar} bo'ldi, [0, 1, 2] bo'lishi kerak")
 
     def test_pdf_rejected(self):
         """PDF fayl rasm sifatida rad etiladi → 400."""
@@ -639,3 +879,202 @@ class KvartiraBepulLimitTests(KvartiraBaseTestCase):
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
         self.assertIn('error', resp.data)
         self.assertIn('3', resp.data['error'])  # "3 ta" deb eslatilgan bo'lishi kerak
+
+
+# ============================================================
+# 7. BEPUL MUDDAT — CHEGARA HOLATLARI (edge cases)
+# ============================================================
+class KvartiraBepulMuddatEdgeCaseTests(KvartiraBaseTestCase):
+    """
+    Bepul muddat chegara holatlari — asosiy bug qamrovi.
+
+    Muammo tavsifi:
+    Rieltor 1-kvartira joyladi ✅, 2-kvartira joyladi ✅,
+    3-kvartira joylashga urinanda ❌ xatolik.
+
+    Sabab: `MaklerProfil.faol` property `bepul_muddat_tugash` ni
+    tekshiradi. Agar `bepul_muddat_tugash` None bo'lsa yoki o'tib
+    ketgan bo'lsa — `faol=False`, shuning uchun `IsAdminOrActiveRieltor`
+    POST so'rovni 403 bilan rad etadi. Limit soni (3 ta) bilan aloqasi yo'q.
+    """
+    url = '/api/rieltor/kvartiralar/'
+
+    def test_bepul_muddat_none_rieltor_cannot_post(self):
+        """
+        bepul_muddat_tugash=None bo'lsa rieltor kvartira qo'sha olmaydi → 403.
+
+        Agar registratsiyada bepul_muddat_tugash o'rnatilmasa yoki
+        admin uni NULL qilib qo'ysa — rieltor hech narsa qo'sha olmaydi.
+        """
+        rieltor_none = CustomUser.objects.create_user(
+            telegram_id=5001, full_name='None Muddat Rieltor', role=CustomUser.Role.MAKLER
+        )
+        MaklerProfil.objects.create(
+            user=rieltor_none,
+            verify_holat=MaklerProfil.VerifyHolat.VERIFIED,
+            bepul_muddat_tugash=None,  # ← NULL!
+        )
+        self.auth(rieltor_none)
+        resp = self.client.post(self.url, self.valid_payload(), format='json')
+        self.assertEqual(
+            resp.status_code, status.HTTP_403_FORBIDDEN,
+            msg="bepul_muddat_tugash=None bo'lsa kvartira qo'shish 403 bo'lishi kerak"
+        )
+
+    def test_bepul_muddat_1_sekund_oldin_tugagan(self):
+        """
+        bepul_muddat_tugash 1 sekund oldin tugagan bo'lsa → 403.
+        faol=False, obuna yo'q → kvartira qo'sha olmaydi.
+        """
+        rieltor_exp = CustomUser.objects.create_user(
+            telegram_id=5002, full_name='Expired Rieltor', role=CustomUser.Role.MAKLER
+        )
+        MaklerProfil.objects.create(
+            user=rieltor_exp,
+            verify_holat=MaklerProfil.VerifyHolat.VERIFIED,
+            bepul_muddat_tugash=timezone.now() - timedelta(seconds=1),
+        )
+        self.auth(rieltor_exp)
+        resp = self.client.post(self.url, self.valid_payload(), format='json')
+        self.assertEqual(
+            resp.status_code, status.HTTP_403_FORBIDDEN,
+            msg="Muddati tugagan rieltor kvartira qo'sha olmasligi kerak"
+        )
+
+    def test_bepul_muddat_ichida_3_ta_hammasi_201(self):
+        """
+        bepul_muddat_tugash kelajakda → 3 ta kvartiraning hammasi 201.
+        Bu normal holatni tasdiqlaydi — bug yo'q.
+        """
+        self.auth(self.rieltor_a)
+        for i in range(3):
+            resp = self.client.post(
+                self.url,
+                self.valid_payload(sarlavha=f'Normal {i+1}'),
+                format='json'
+            )
+            self.assertEqual(
+                resp.status_code, status.HTTP_201_CREATED,
+                msg=(
+                    f"{i+1}-kvartira qo'shilmadi (status={resp.status_code}). "
+                    f"Javob: {resp.data}. "
+                    f"SABAB: bepul_muddat_tugash o'tib ketgan yoki None bo'lishi mumkin."
+                )
+            )
+
+    def test_bepul_muddat_aynan_endi_tugayapti(self):
+        """
+        bepul_muddat_tugash = timezone.now() → boundary condition.
+        `faol` property: `now <= bepul_muddat_tugash` → True (tenglik ham ruxsat).
+        """
+        rieltor_now = CustomUser.objects.create_user(
+            telegram_id=5003, full_name='Now Boundary Rieltor', role=CustomUser.Role.MAKLER
+        )
+        MaklerProfil.objects.create(
+            user=rieltor_now,
+            verify_holat=MaklerProfil.VerifyHolat.VERIFIED,
+            bepul_muddat_tugash=timezone.now() + timedelta(seconds=30),  # 30 sekund qolgan
+        )
+        self.auth(rieltor_now)
+        resp = self.client.post(self.url, self.valid_payload(), format='json')
+        self.assertEqual(
+            resp.status_code, status.HTTP_201_CREATED,
+            msg="30 sekund qolgan paytda kvartira qo'shish mumkin bo'lishi kerak"
+        )
+
+    def test_1_va_2_qoshildi_3_chi_ham_qoshiladi(self):
+        """
+        ASOSIY BUG TEST: 1-kvartira ✅, 2-kvartira ✅, 3-kvartira ham ✅ bo'lishi kerak.
+
+        Agar 3-kvartira 403 bilan rad etilsa — sabab:
+        1. bepul_muddat_tugash o'tib ketgan (eski muddat bilan test)
+        2. bepul_muddat_tugash=None (registratsiyada o'rnatilmagan)
+        3. BEPUL_KVARTIRA_LIMIT=2 (env da noto'g'ri qiymat)
+
+        Bu test shu muammoni aniq ushlab beradi va xato sababini ko'rsatadi.
+        """
+        self.auth(self.rieltor_a)
+
+        # 1-kvartira
+        r1 = self.client.post(self.url, self.valid_payload(sarlavha='1-kvartira'), format='json')
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED,
+            msg=f"1-kvartira qo'shilmadi: status={r1.status_code}, javob={r1.data}")
+
+        # 2-kvartira
+        r2 = self.client.post(self.url, self.valid_payload(sarlavha='2-kvartira'), format='json')
+        self.assertEqual(r2.status_code, status.HTTP_201_CREATED,
+            msg=f"2-kvartira qo'shilmadi: status={r2.status_code}, javob={r2.data}")
+
+        # 3-kvartira — muammo shu yerda!
+        r3 = self.client.post(self.url, self.valid_payload(sarlavha='3-kvartira'), format='json')
+        self.assertEqual(
+            r3.status_code, status.HTTP_201_CREATED,
+            msg=(
+                f"3-kvartira qo'shilmadi: status={r3.status_code}, javob={r3.data}\n\n"
+                f"SABAB TAHLILI:\n"
+                f"  - Agar status=403 va 'obuna_kerak' bor → BEPUL_KVARTIRA_LIMIT=2 (env da)\n"
+                f"  - Agar status=403 va 'Bepul sinov muddati tugagan' → "
+                f"bepul_muddat_tugash o'tib ketgan\n"
+                f"  - Agar status=403 va 'Rieltor profili topilmadi' → "
+                f"profil yo'q yoki None\n"
+                f"  Rieltor_a bepul_muddat_tugash: {self.profil_a.bepul_muddat_tugash}\n"
+                f"  Hozir: {timezone.now()}\n"
+                f"  Faol: {self.profil_a.faol}"
+            )
+        )
+
+        # Jami 3 ta bo'lishi kerak
+        jami = Kvartira.objects.filter(qoshgan=self.rieltor_a).count()
+        self.assertEqual(jami, 3,
+            msg=f"DB'da {jami} ta kvartira bor, 3 ta bo'lishi kerak edi")
+
+    def test_3_qoshilgandan_keyin_4_rad_etiladi(self):
+        """
+        1✅ 2✅ 3✅ → limit to'ldi → 4✅ RAD ETILDI.
+        Bu to'g'ri xatti-harakat — 3 ta limit ishlayapti.
+        """
+        self.auth(self.rieltor_a)
+        for i in range(3):
+            resp = self.client.post(
+                self.url, self.valid_payload(sarlavha=f'K{i+1}'), format='json'
+            )
+            self.assertEqual(resp.status_code, status.HTTP_201_CREATED,
+                msg=f"{i+1}-kvartira qo'shilmadi: {resp.data}")
+
+        # 4-chi rad etiladi
+        r4 = self.client.post(self.url, self.valid_payload(sarlavha='4-kvartira'), format='json')
+        self.assertEqual(r4.status_code, status.HTTP_403_FORBIDDEN,
+            msg="4-chi kvartira 403 bilan rad etilishi kerak edi")
+        self.assertIn('obuna_kerak', r4.data)
+        self.assertEqual(r4.data['limit'], 3)
+
+    def test_bepul_muddat_tugash_vps_timezone_muammo(self):
+        """
+        VPS da timezone muammosi: agar server UTC da ishlasa va
+        Django TIME_ZONE='Asia/Tashkent' bo'lsa, bepul_muddat_tugash
+        UTC da saqlanishi kerak. Agar noto'g'ri saved bo'lsa (naive datetime),
+        5 soat farq tufayli muddat erta tugagan ko'rinadi.
+
+        Bu test timezone-aware datetime ishlatilishini tekshiradi.
+        """
+        self.assertTrue(
+            self.profil_a.bepul_muddat_tugash.tzinfo is not None,
+            msg=(
+                "bepul_muddat_tugash timezone-naive saqlangan! "
+                "USE_TZ=True bo'lsa har doim timezone-aware bo'lishi kerak. "
+                "VPS da UTC vs Tashkent (+5) farq tufayli muddat 5 soat erta tugaydi."
+            )
+        )
+        # timezone.now() ham aware bo'lishi kerak
+        now = timezone.now()
+        self.assertTrue(
+            now.tzinfo is not None,
+            msg="timezone.now() naive datetime qaytardi — USE_TZ=True bo'lishi kerak"
+        )
+        # Taqqoslash xatosiz bo'lishi kerak
+        try:
+            result = now <= self.profil_a.bepul_muddat_tugash
+        except TypeError as e:
+            self.fail(
+                f"Aware va naive datetime taqqoslanmoqda — timezone xatosi: {e}"
+            )

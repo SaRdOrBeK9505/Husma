@@ -138,8 +138,10 @@ def _telegram_bogla_url(user) -> str:
     Mijoz bilan Telegram orqali bog'lanish uchun URL qaytaradi.
 
     - Agar telegram_username bo'lsa -> https://t.me/<username>
-    - Aks holda telegram_id orqali -> tg://user?id=<telegram_id>
-    - Ikkalasi ham bo'lmasa -> bo'sh string
+    - Aks holda -> bo'sh string (telegram_id orqali inline tugma ishlamaydi)
+    
+    MUHIM: tg://user?id=<telegram_id> deep link Telegram Bot API
+    inline_keyboard da qo'llab-quvvatlanmaydi — faqat https:// URLlar ishlaydi.
     """
     if user is None:
         return ""
@@ -147,10 +149,6 @@ def _telegram_bogla_url(user) -> str:
     username = (getattr(user, 'telegram_username', '') or '').lstrip('@').strip()
     if username:
         return f"https://t.me/{username}"
-
-    telegram_id = getattr(user, 'telegram_id', None)
-    if telegram_id:
-        return f"tg://user?id={telegram_id}"
 
     return ""
 
