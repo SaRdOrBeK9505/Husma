@@ -18,6 +18,7 @@ from rest_framework.pagination import PageNumberPagination
 from core.permissions import IsAdminOrActiveRieltor, bepul_kvartira_limiti_tekshir
 from .models import Kvartira, KvartiraRasm, KvartiraPlanirovka
 from .filters import KvartiraFilter
+from .mixins import LogRequestMixin
 
 
 class KvartiraPagination(PageNumberPagination):
@@ -87,8 +88,9 @@ class KvartiraDetailView(RetrieveAPIView):
 # ============================================================
 # RIELTOR — o'z kvartiralarini boshqarish
 # ============================================================
-class RieltorKvartiraListCreateView(ListCreateAPIView):
+class RieltorKvartiraListCreateView(LogRequestMixin, ListCreateAPIView):
     """Rieltor o'z kvartiralarini ko'radi va yangi qo'shadi."""
+    log_action_name = 'RIELTOR KVARTIRA LIST/CREATE'
     permission_classes = [IsAdminOrActiveRieltor]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = KvartiraPagination
@@ -169,8 +171,9 @@ class RieltorKvartiraListCreateView(ListCreateAPIView):
         )
 
 
-class RieltorKvartiraDetailView(RetrieveUpdateDestroyAPIView):
+class RieltorKvartiraDetailView(LogRequestMixin, RetrieveUpdateDestroyAPIView):
     """Rieltor o'z kvartirasini ko'radi / tahrirlaydi / o'chiradi."""
+    log_action_name = 'RIELTOR KVARTIRA DETAIL'
     permission_classes = [IsAdminOrActiveRieltor]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
@@ -209,8 +212,9 @@ class RieltorKvartiraDetailView(RetrieveUpdateDestroyAPIView):
         return super().delete(request, *args, **kwargs)
 
 
-class RieltorKvartiraStatusView(APIView):
+class RieltorKvartiraStatusView(LogRequestMixin, APIView):
     """Rieltor kvartira statusini o'zgartiradi (faol / sotilgan / arxiv)."""
+    log_action_name = 'RIELTOR KVARTIRA STATUS'
     permission_classes = [IsAdminOrActiveRieltor]
 
     def get_object(self, request, pk):
@@ -233,8 +237,9 @@ class RieltorKvartiraStatusView(APIView):
 # ============================================================
 # RIELTOR — rasm boshqaruvi
 # ============================================================
-class RieltorKvartiraRasmView(APIView):
+class RieltorKvartiraRasmView(LogRequestMixin, APIView):
     """Mavjud kvartiraga yangi rasm(lar) qo'shish."""
+    log_action_name = 'RIELTOR KVARTIRA RASM QO\'SHISH'
     permission_classes = [IsAdminOrActiveRieltor]
     parser_classes = [MultiPartParser, FormParser]
 
@@ -280,8 +285,9 @@ class RieltorKvartiraRasmView(APIView):
         )
 
 
-class RieltorKvartiraRasmDeleteView(APIView):
+class RieltorKvartiraRasmDeleteView(LogRequestMixin, APIView):
     """Kvartira rasmini o'chirish."""
+    log_action_name = 'RIELTOR KVARTIRA RASM O\'CHIRISH'
     permission_classes = [IsAdminOrActiveRieltor]
 
     @extend_schema(summary="Rieltor: kvartira rasmini o'chirish", responses={204: None}, tags=["Kvartira - Rieltor"])
@@ -294,8 +300,9 @@ class RieltorKvartiraRasmDeleteView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class RieltorKvartiraRasmAsosiyView(APIView):
+class RieltorKvartiraRasmAsosiyView(LogRequestMixin, APIView):
     """Rasmni bosh (asosiy) rasm qilib belgilash."""
+    log_action_name = 'RIELTOR KVARTIRA RASM ASOSIY'
     permission_classes = [IsAdminOrActiveRieltor]
 
     @extend_schema(summary="Rieltor: bosh rasmni belgilash", request=None, responses={200: KvartiraRasmSerializer}, tags=["Kvartira - Rieltor"])
@@ -310,8 +317,9 @@ class RieltorKvartiraRasmAsosiyView(APIView):
         return Response(KvartiraRasmSerializer(rasm).data)
 
 
-class RieltorKvartiraPlanirovkaDeleteView(APIView):
+class RieltorKvartiraPlanirovkaDeleteView(LogRequestMixin, APIView):
     """Planirovka rasmini o'chirish."""
+    log_action_name = 'RIELTOR KVARTIRA PLANIROVKA O\'CHIRISH'
     permission_classes = [IsAdminOrActiveRieltor]
 
     @extend_schema(summary="Rieltor: planirovkani o'chirish", responses={204: None}, tags=["Kvartira - Rieltor"])

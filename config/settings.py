@@ -369,6 +369,8 @@ BEPUL_KVARTIRA_LIMIT = int(os.getenv('BEPUL_KVARTIRA_LIMIT', '3'))
 # ===== LOGGING — Telegram auth request diagnostikasi =====
 # 'telegram_auth' logger barcha kelgan request body / header larni
 # logs/telegram_auth.log fayliga va konsolga yozadi.
+# 'apps.kvartira.requests' logger rieltor kvartira CRUD so'rovlarini
+# logs/kvartira_requests.log fayliga yozadi (RotatingFileHandler, max 10MB x 5).
 LOGS_DIR = BASE_DIR / 'logs'
 LOGS_DIR.mkdir(exist_ok=True)
 
@@ -405,10 +407,25 @@ LOGGING = {
             'level': 'ERROR',
             'formatter': 'error_format',
         },
+        # Rieltor kvartira CRUD so'rovlari — RotatingFileHandler (10MB x 5)
+        'kvartira_requests_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOGS_DIR / 'kvartira_requests.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,
+            'encoding': 'utf-8',
+            'formatter': 'verbose',
+        },
     },
     'loggers': {
         'telegram_auth': {
             'handlers': ['console', 'telegram_auth_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Rieltor kvartira so'rov/javob loglari
+        'apps.kvartira.requests': {
+            'handlers': ['console', 'kvartira_requests_file'],
             'level': 'INFO',
             'propagate': False,
         },

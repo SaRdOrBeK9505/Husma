@@ -64,6 +64,7 @@ class RieltorProfilAdmin(admin.ModelAdmin):
         'user', 'username_display', 'verify_holat', 'faol',
         'bepul_muddat_tugash', 'qoshimcha_bepul_muddat_berildi',
         'obuna_faol_display', 'obuna_tugash',
+        'telegram_bloklangan',
         'ortacha_reyting', 'jami_bitimlar', 'created_at',
     ]
     list_filter = [
@@ -71,6 +72,7 @@ class RieltorProfilAdmin(admin.ModelAdmin):
         ObunaHolatFilter,
         'qoshimcha_bepul_muddat_berildi',
         'promo_xabar_yuborildi',
+        'telegram_bloklangan',
     ]
     search_fields = [
         'user__full_name', 'user__telegram_username',
@@ -81,6 +83,7 @@ class RieltorProfilAdmin(admin.ModelAdmin):
         'ortacha_reyting', 'jami_bitimlar', 'verify_qilingan_vaqt',
         'faol', 'obuna_faol_display', 'obuna_tugash', 'login_malumotlari',
         'qoshimcha_bepul_muddat_vaqti', 'promo_xabar_vaqti',
+        'telegram_bloklangan_vaqt',
     ]
 
     fieldsets = (
@@ -93,6 +96,16 @@ class RieltorProfilAdmin(admin.ModelAdmin):
             'description': (
                 "verify_holat = 'Bloklangan' qilinsa, obuna/bepul muddatidan "
                 "qat'i nazar rieltor ishlay olmaydi."
+            ),
+        }),
+        ('Telegram holati', {
+            'fields': ('telegram_bloklangan', 'telegram_bloklangan_vaqt'),
+            'description': (
+                "'Telegram bloklangan' = True bo'lsa, bu rieltorga Telegram xabari "
+                "yuborilmaydi (bot bloklangan yoki /start bosilmagan). "
+                "Rieltor botga /start bossa yoki birinchi muvaffaqiyatli xabar "
+                "ketgandan keyin avtomatik False ga qaytariladi. "
+                "Qo'lda ham False qilib unblock qilsa bo'ladi."
             ),
         }),
         ('Sinov va Obuna', {

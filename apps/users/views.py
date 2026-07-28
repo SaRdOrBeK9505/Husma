@@ -32,6 +32,33 @@ import json as _json
 _auth_log = _logging.getLogger("telegram_auth")
 
 
+def _telegram_bloklarni_ochir(user, telegram_id: int) -> None:
+    """
+    Telegram orqali muvaffaqiyatli login bo'lsa, agar user ning makler
+    profili telegram_bloklangan=True bo'lsa — avtomatik False ga o'tkazadi.
+
+    Bu user botga qayta /start bosganini (yoki ilovani ochganini) bildiradi,
+    demak bot endi bloklangan emas.
+    """
+    try:
+        profil = getattr(user, 'rieltor_profil', None)
+        if profil is None:
+            return
+        if profil.telegram_bloklangan:
+            profil.telegram_bloklangan = False
+            profil.save(update_fields=['telegram_bloklangan'])
+            _auth_log.info(
+                "[Telegram Unblock] Makler telegram_bloklangan=False qilindi: "
+                "user_id=%s, telegram_id=%s",
+                user.id, telegram_id,
+            )
+    except Exception as exc:
+        # Unblock muvaffaqiyatsiz bo'lsa asosiy login oqimini to'xtatmaymiz
+        _auth_log.error(
+            "[Telegram Unblock] Xato: user_id=%s, err=%s", user.id, exc
+        )
+
+
 class AuthRateThrottle(AnonRateThrottle):
     """Auth endpointlari uchun qattiqroq rate limit."""
     scope = 'auth'
@@ -200,6 +227,9 @@ class TelegramAuthView(RequestLogMixin, APIView):
             )
             user.save(update_fields=['telegram_username', 'full_name'])
 
+        # Telegram login = foydalanuvchi botda faol.
+        # Agar avval bot bloklangan deb belgilangan bo'lsa — avtomatik unblock qilamiz.
+        _telegram_bloklarni_ochir(user, telegram_id)
         try:
             tokens = get_tokens_for_user(user)
             _auth_log.info(f"JWT token yaratildi: user_id={user.id}")

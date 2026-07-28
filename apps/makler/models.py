@@ -91,6 +91,23 @@ class MaklerProfil(models.Model):
         default=0.00
     )
     jami_bitimlar = models.PositiveIntegerField(default=0)
+
+    # Telegram bot bloklash holati.
+    # True bo'lsa — bu rieltorga Telegram xabari yuborilmaydi (403 xatosi qaytgan).
+    # Rieltor botga /start bosganida (yoki birinchi muvaffaqiyatli xabar ketganida)
+    # avtomatik False ga qaytariladi.
+    telegram_bloklangan = models.BooleanField(
+        default=False,
+        verbose_name="Telegram bloklangan",
+        help_text="Bot bloklangan yoki foydalanuvchi /start bosmagan. True bo'lsa xabar yuborilmaydi."
+    )
+    telegram_bloklangan_vaqt = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Bloklangan vaqti",
+        help_text="telegram_bloklangan=True qilingan vaqt (audit uchun)"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
