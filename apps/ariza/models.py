@@ -8,6 +8,8 @@ class Ariza(models.Model):
     class ArizaTuri(models.TextChoices):
         IJARA = 'ijara', 'Ijaraga olish'
         SOTIB_OLISH = 'sotib_olish', 'Sotib olish'
+        IJARA_BERISH = 'ijara_berish', 'Ijaraga berish'
+        SOTISH = 'sotish', 'Sotish'
 
     class XonalarSoni(models.TextChoices):
         BIR = '1', '1 xonali'
@@ -57,9 +59,10 @@ class Ariza(models.Model):
     xonalar_soni = models.CharField(
         max_length=5,
         choices=XonalarSoni.choices,
+        default=XonalarSoni.BIR,
     )
     narx_min = models.BigIntegerField()
-    narx_max = models.BigIntegerField()
+    narx_max = models.BigIntegerField(null=True, blank=True)
     valyuta = models.CharField(
         max_length=3,
         choices=Valyuta.choices,

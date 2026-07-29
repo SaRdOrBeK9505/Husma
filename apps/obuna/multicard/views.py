@@ -31,7 +31,9 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from drf_spectacular.utils import extend_schema, OpenApiExample
+from drf_spectacular.utils import extend_schema, OpenApiExample, inline_serializer
+from drf_spectacular.types import OpenApiTypes
+from rest_framework import serializers as drf_serializers
 from .client import MulticardClient, MulticardError
 
 from apps.obuna.models import Tolov, Obuna
@@ -141,7 +143,32 @@ class MulticardCallbackView(APIView):
         ),
         tags=["Multicard"],
         examples=[CALLBACK_REQUEST_EXAMPLE],
-        responses={200: dict},
+        request=inline_serializer(
+            name='MulticardCallbackRequest',
+            fields={
+                'store_id':     drf_serializers.IntegerField(),
+                'amount':       drf_serializers.IntegerField(),
+                'invoice_id':   drf_serializers.CharField(),
+                'billing_id':   drf_serializers.CharField(),
+                'payment_time': drf_serializers.CharField(),
+                'phone':        drf_serializers.CharField(required=False),
+                'card_pan':     drf_serializers.CharField(required=False),
+                'ps':           drf_serializers.CharField(required=False),
+                'card_token':   drf_serializers.CharField(required=False),
+                'uuid':         drf_serializers.CharField(),
+                'receipt_url':  drf_serializers.CharField(required=False),
+                'sign':         drf_serializers.CharField(),
+            }
+        ),
+        responses={
+            200: inline_serializer(
+                name='MulticardCallbackResponse',
+                fields={
+                    'success': drf_serializers.BooleanField(),
+                    'message': drf_serializers.CharField(required=False),
+                }
+            )
+        },
     )
     def post(self, request):
         data = request.data
@@ -250,6 +277,19 @@ class MulticardReturnView(APIView):
         summary="Multicard return_url (foydalanuvchi uchun)",
         description="To'lovdan keyin foydalanuvchi shu URL ga redirect qilinadi.",
         tags=["Multicard"],
+        responses={
+            302: inline_serializer(
+                name='MulticardReturnRedirect',
+                fields={'detail': drf_serializers.CharField()}
+            ),
+            200: inline_serializer(
+                name='MulticardReturnFallback',
+                fields={
+                    'invoice_id': drf_serializers.CharField(),
+                    'message':    drf_serializers.CharField(),
+                }
+            ),
+        },
     )
     def get(self, request):
         invoice_id = request.query_params.get("invoice_id", "")

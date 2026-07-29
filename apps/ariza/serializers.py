@@ -39,10 +39,13 @@ class ArizaYaratishSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-        if data['narx_min'] > data['narx_max']:
-            raise serializers.ValidationError(
-                {'narx_min': 'Minimal narx maksimal narxdan katta bo\'lishi mumkin emas'}
-            )
+        narx_min = data.get('narx_min')
+        narx_max = data.get('narx_max')
+        if narx_min is not None and narx_max is not None:
+            if narx_min > narx_max:
+                raise serializers.ValidationError(
+                    {'narx_min': 'Minimal narx maksimal narxdan katta bo\'lishi mumkin emas'}
+                )
         return data
 
 

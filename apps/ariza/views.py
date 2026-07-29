@@ -20,6 +20,11 @@ from apps.users.models import CustomUser
 from apps.makler.models import MaklerProfil
 from django.db.models import Count, Q
 
+# Ariza turi uchun ruxsat etilgan qiymatlar — model dan bir martalik olish
+_ARIZA_TURI_VALUES = [v for v, _ in Ariza.ArizaTuri.choices]
+# Holat uchun ruxsat etilgan qiymatlar
+_HOLAT_VALUES = [v for v, _ in Ariza.Holat.choices]
+
 
 class ArizaYaratishView(CreateAPIView):
     permission_classes = [IsUserOrRieltor]
@@ -72,6 +77,14 @@ class UserArizalarView(ListAPIView):
                 enum=['yangi', 'korilmoqda', 'yopilgan'],
             ),
             OpenApiParameter(
+                name='ariza_turi',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description="Ariza turi bo'yicha filter: ijara | sotib_olish | ijara_berish | sotish",
+                required=False,
+                enum=['ijara', 'sotib_olish', 'ijara_berish', 'sotish'],
+            ),
+            OpenApiParameter(
                 name='page', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
                 description="Sahifa raqami", required=False,
             ),
@@ -95,8 +108,12 @@ class UserArizalarView(ListAPIView):
         ).select_related('hudud', 'viloyat', 'mulk_turi')
 
         holat = self.request.query_params.get('holat')
-        if holat in ['yangi', 'korilmoqda', 'yopilgan']:
+        if holat in _HOLAT_VALUES:
             qs = qs.filter(holat=holat)
+
+        ariza_turi = self.request.query_params.get('ariza_turi')
+        if ariza_turi in _ARIZA_TURI_VALUES:
+            qs = qs.filter(ariza_turi=ariza_turi)
 
         return qs
 
@@ -191,6 +208,14 @@ class RieltorArizalarView(ListAPIView):
                 enum=['yangi', 'korilmoqda', 'yopilgan'],
             ),
             OpenApiParameter(
+                name='ariza_turi',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description="Ariza turi bo'yicha filter: ijara | sotib_olish | ijara_berish | sotish",
+                required=False,
+                enum=['ijara', 'sotib_olish', 'ijara_berish', 'sotish'],
+            ),
+            OpenApiParameter(
                 name='page', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY,
                 description="Sahifa raqami", required=False,
             ),
@@ -210,16 +235,17 @@ class RieltorArizalarView(ListAPIView):
             return Ariza.objects.none()
         rieltor = self.request.user.rieltor_profil
 
-        # MUHIM: ariza_ids + id__in o'rniga to'g'ridan JOIN ishlatiladi.
-        # Avvalgi yondashuv: 2 ta alohida so'rov (ArizaMakler query + IN(...)).
-        # Hozirgi: bitta JOIN — katta user bazasida sezilarli tez.
         qs = Ariza.objects.filter(
             ariza_rieltorlar__rieltor=rieltor,
         ).select_related('hudud', 'viloyat', 'mulk_turi', 'user')
 
         holat = self.request.query_params.get('holat')
-        if holat in ['yangi', 'korilmoqda', 'yopilgan']:
+        if holat in _HOLAT_VALUES:
             qs = qs.filter(holat=holat)
+
+        ariza_turi = self.request.query_params.get('ariza_turi')
+        if ariza_turi in _ARIZA_TURI_VALUES:
+            qs = qs.filter(ariza_turi=ariza_turi)
 
         return qs
 
@@ -445,7 +471,15 @@ class AdminArizalarView(ListAPIView):
                 description="Holat bo'yicha filter: yangi | korilmoqda | yopilgan",
                 required=False,
                 enum=['yangi', 'korilmoqda', 'yopilgan'],
-            )
+            ),
+            OpenApiParameter(
+                name='ariza_turi',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description="Ariza turi bo'yicha filter: ijara | sotib_olish | ijara_berish | sotish",
+                required=False,
+                enum=['ijara', 'sotib_olish', 'ijara_berish', 'sotish'],
+            ),
         ],
         responses={200: ArizaSerializer(many=True)},
         tags=["Admin"],
@@ -462,8 +496,12 @@ class AdminArizalarView(ListAPIView):
         ).prefetch_related('ariza_rieltorlar')
         
         holat = self.request.query_params.get('holat')
-        if holat in ['yangi', 'korilmoqda', 'yopilgan']:
+        if holat in _HOLAT_VALUES:
             qs = qs.filter(holat=holat)
+
+        ariza_turi = self.request.query_params.get('ariza_turi')
+        if ariza_turi in _ARIZA_TURI_VALUES:
+            qs = qs.filter(ariza_turi=ariza_turi)
         
         return qs
 
@@ -514,16 +552,22 @@ class AdminDashboardStatsView(APIView):
             count=Count('id')
         ).order_by('holat')
         
-        holat_stats = {
-            'yangi': 0,
-            'korilmoqda': 0,
-            'yopilgan': 0
-        }
-        
+        holat_stats = {v: 0 for v, _ in Ariza.Holat.choices}
         for item in ariza_holatlari:
             holat = item['holat']
             if holat in holat_stats:
                 holat_stats[holat] = item['count']
+
+        # Ariza turi bo'yicha statistika
+        ariza_turi_raw = Ariza.objects.values('ariza_turi').annotate(
+            count=Count('id')
+        ).order_by('ariza_turi')
+
+        ariza_turi_stats = {v: 0 for v, _ in Ariza.ArizaTuri.choices}
+        for item in ariza_turi_raw:
+            turi = item['ariza_turi']
+            if turi in ariza_turi_stats:
+                ariza_turi_stats[turi] = item['count']
         
         return Response({
             'jami_arizalar': jami_arizalar,
@@ -531,4 +575,5 @@ class AdminDashboardStatsView(APIView):
             'jami_userlar': jami_userlar,
             'yangi_arizalar': yangi_arizalar,
             'ariza_holatlari': holat_stats,
+            'ariza_turlari': ariza_turi_stats,
         })

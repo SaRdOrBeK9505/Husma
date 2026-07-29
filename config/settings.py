@@ -166,13 +166,28 @@ SPECTACULAR_SETTINGS = {
                 }
             }
         },
-    # Bir nechta modelda 'holat' maydoni borligi sababli enum nomlari to'qnashadi.
+    # Bir nechta modelda bir xil nomdagi TextChoices borligi sababli enum
+    # nomlari to'qnashadi (ariza_turi, xonalar_soni, valyuta, holat).
     # Har birini aniq nomlash bilan Swagger schema toza chiqadi.
     'ENUM_NAME_OVERRIDES': {
-        'ArizaHolatEnum': 'apps.ariza.models.Ariza.Holat',
-        'ObunaHolatEnum': 'apps.obuna.models.Obuna.Holat',
-        'TolovHolatEnum': 'apps.obuna.models.Tolov.Holat',
-        'TolovProvayderEnum': 'apps.obuna.models.Tolov.Provayder',
+        # --- Ariza modeli ---
+        'ArizaTuriEnum':          'apps.ariza.models.Ariza.ArizaTuri',
+        'ArizaHolatEnum':         'apps.ariza.models.Ariza.Holat',
+        'ArizaXonalarSoniEnum':   'apps.ariza.models.Ariza.XonalarSoni',
+        'ArizaValyutaEnum':       'apps.ariza.models.Ariza.Valyuta',
+
+        # --- Kvartira modeli ---
+        'KvartiraArizaTuriEnum':  'apps.kvartira.models.Kvartira.ArizaTuri',
+        'KvartiraHolatEnum':      'apps.kvartira.models.Kvartira.Holat',
+        'KvartiraXonalarSoniEnum':'apps.kvartira.models.Kvartira.XonalarSoni',
+        'KvartiraValyutaEnum':    'apps.kvartira.models.Kvartira.Valyuta',
+        'KvartiraNarxDavriEnum':  'apps.kvartira.models.Kvartira.NarxDavri',
+        'KvartiraRemontEnum':     'apps.kvartira.models.Kvartira.RemontHolati',
+
+        # --- Obuna / To'lov modellari ---
+        'ObunaHolatEnum':         'apps.obuna.models.Obuna.Holat',
+        'TolovHolatEnum':         'apps.obuna.models.Tolov.Holat',
+        'TolovProvayderEnum':     'apps.obuna.models.Tolov.Provayder',
     },
 }
 

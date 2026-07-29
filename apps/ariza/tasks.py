@@ -278,11 +278,14 @@ def _xabar_matni_tayorla(ariza_makler: ArizaMakler) -> str:
     mulk_turi = ariza.mulk_turi.nomi if ariza.mulk_turi else "Noma'lum"
     hudud = ariza.hudud.nomi if ariza.hudud else "Noma'lum"
     valyuta = ariza.get_valyuta_display()
-    narx = f"{ariza.narx_min:,} - {ariza.narx_max:,} {valyuta}"
+    if ariza.narx_max is not None:
+        narx = f"{ariza.narx_min:,} - {ariza.narx_max:,} {valyuta}"
+    else:
+        narx = f"{ariza.narx_min:,}+ {valyuta}"
     # Telefonni dialer ochiladigan toza formatda ko'rsatamiz
     telefon_str = _telefon_tozala(ariza.telefon) or "Ko'rsatilmagan"
 
-    # Ariza turi (maqsad) - ijaraga olish yoki sotib olish
+    # Ariza turi (maqsad) - ijaraga olish, sotib olish, ijaraga berish yoki sotish
     ariza_turi = ariza.get_ariza_turi_display()
 
     # Xonalar soni
@@ -432,7 +435,10 @@ def kanalga_yangi_ariza_xabari_yubor(self, ariza_id: int) -> dict:
         mulk_turi = ariza.mulk_turi.nomi if ariza.mulk_turi else "Noma'lum"
         hudud = ariza.hudud.nomi if ariza.hudud else "Noma'lum"
         valyuta = ariza.get_valyuta_display()
-        narx = f"{ariza.narx_min:,} - {ariza.narx_max:,} {valyuta}"
+        if ariza.narx_max is not None:
+            narx = f"{ariza.narx_min:,} - {ariza.narx_max:,} {valyuta}"
+        else:
+            narx = f"{ariza.narx_min:,}+ {valyuta}"
         telefon_str = _telefon_tozala(ariza.telefon) or "Ko'rsatilmagan"
 
         ariza_turi = ariza.get_ariza_turi_display()

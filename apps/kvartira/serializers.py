@@ -21,7 +21,7 @@ try:
     HEIC_QOLLAB_QUVVATLANADI = True
 except Exception as e:  # pragma: no cover - kutubxona yo'q bo'lsa
     HEIC_QOLLAB_QUVVATLANADI = False
-    logger.error(f"pillow-heif yuklanmadi: {e}")
+    logger.warning("pillow-heif yuklanmadi (HEIC fayllari qabul qilinmaydi): %s", e)
 
 # Bitta e'longa ruxsat etilgan maksimal rasm soni (owner talabi: 8 tagacha)
 MAX_RASM_SONI = 8
