@@ -131,7 +131,14 @@ class CustomUserAdmin(UserAdmin):
         'telegram_username', 'role', 'is_staff', 'is_active', 'created_at',
     ]
     list_filter = ['role', 'is_active', 'is_staff', 'is_superuser']
-    search_fields = ['=telegram_id', 'username', 'full_name', 'telegram_username', 'phone']
+    search_fields = ['username', 'full_name', 'telegram_username', 'phone']
+
+    def get_search_results(self, request, queryset, search_term):
+        queryset, may_have_duplicates = super().get_search_results(request, queryset, search_term)
+        # telegram_id raqamli maydon — alohida qidiramiz
+        if search_term.strip().lstrip('-').isdigit():
+            queryset |= self.model.objects.filter(telegram_id=search_term.strip())
+        return queryset, may_have_duplicates
     ordering = ['-created_at']
     
     # Tahrirlash formasidagi maydonlar

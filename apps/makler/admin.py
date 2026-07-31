@@ -76,8 +76,15 @@ class RieltorProfilAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         'user__full_name', 'user__telegram_username',
-        'user__username', 'user__phone', '=user__telegram_id',
+        'user__username', 'user__phone',
     ]
+
+    def get_search_results(self, request, queryset, search_term):
+        queryset, may_have_duplicates = super().get_search_results(request, queryset, search_term)
+        # telegram_id raqamli maydon — alohida qidiramiz
+        if search_term.strip().lstrip('-').isdigit():
+            queryset |= self.model.objects.filter(user__telegram_id=search_term.strip())
+        return queryset, may_have_duplicates
     filter_horizontal = ['hududlar', 'mulk_turlari']
     readonly_fields = [
         'ortacha_reyting', 'jami_bitimlar', 'verify_qilingan_vaqt',
