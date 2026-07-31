@@ -131,7 +131,7 @@ class CustomUserAdmin(UserAdmin):
         'telegram_username', 'role', 'is_staff', 'is_active', 'created_at',
     ]
     list_filter = ['role', 'is_active', 'is_staff', 'is_superuser']
-    search_fields = ['telegram_id', 'username', 'full_name', 'telegram_username', 'phone']
+    search_fields = ['=telegram_id', 'username', 'full_name', 'telegram_username', 'phone']
     ordering = ['-created_at']
     
     # Tahrirlash formasidagi maydonlar

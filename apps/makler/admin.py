@@ -76,7 +76,7 @@ class RieltorProfilAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         'user__full_name', 'user__telegram_username',
-        'user__username', 'user__phone',
+        'user__username', 'user__phone', '=user__telegram_id',
     ]
     filter_horizontal = ['hududlar', 'mulk_turlari']
     readonly_fields = [
